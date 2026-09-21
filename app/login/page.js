@@ -1,30 +1,38 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+  const attemptLogin = async (email, password) => {
     setError('')
     setLoading(true)
-
     const { error: loginError } = await supabase.auth.signInWithPassword({ email, password })
-
     if (loginError) {
       setError(loginError.message)
       setLoading(false)
       return
     }
-
-    setLoading(false)
     router.push('/dashboard')
+  }
+
+  useEffect(() => {
+    const email = searchParams.get('email')
+    const password = searchParams.get('password')
+    if (email && password) {
+      attemptLogin(email, password)
+    }
+  }, [])
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    await attemptLogin(formData.get('email'), formData.get('password'))
   }
 
   return (
@@ -33,11 +41,11 @@ export default function Login() {
       <form onSubmit={handleLogin}>
         <div style={{ marginBottom: 12 }}>
           <label>Email</label><br/>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: 8 }} />
+          <input name="email" type="email" required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>Password</label><br/>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: 8 }} />
+          <input name="password" type="password" required style={{ width: '100%', padding: 8 }} />
         </div>
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>

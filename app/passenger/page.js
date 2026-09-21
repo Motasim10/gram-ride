@@ -15,6 +15,10 @@ export default function PassengerPage() {
   const [activeRide, setActiveRide] = useState(null)
   const [bids, setBids] = useState([])
   const [counterAmount, setCounterAmount] = useState('')
+  const [ratingRide, setRatingRide] = useState(null)
+  const [stars, setStars] = useState(0)
+  const [comment, setComment] = useState('')
+  const [ratingSubmitted, setRatingSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -75,12 +79,13 @@ export default function PassengerPage() {
       .channel('passenger-rides-' + uid + '-' + Math.random().toString(36).slice(2))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rides', filter: `passenger_id=eq.${uid}` }, (payload) => {
         if (payload.eventType === 'DELETE') return
-        if (payload.new.status === 'completed') {
+                if (payload.new.status === 'completed') {
+          setRatingRide(payload.new)
           setActiveRide(null)
           setPickup('')
           setDestination('')
           setSeats(1)
-        } else {
+                } else {
           setActiveRide(payload.new)
         }
       })
@@ -142,8 +147,68 @@ export default function PassengerPage() {
     setLoading(false)
   }
 
+    const handleSubmitRating = async () => {
+    if (!stars) return
+    setLoading(true)
+    await supabase.from('ratings').insert({
+      ride_id: ratingRide.id,
+      passenger_id: userId,
+      driver_id: ratingRide.driver_id,
+      stars,
+      comment,
+    })
+    setRatingSubmitted(true)
+    setLoading(false)
+  }
+
+  const closeRating = () => {
+    setRatingRide(null)
+    setStars(0)
+    setComment('')
+    setRatingSubmitted(false)
+  }
+
   const typeLabel = (t) => (t === 'reserve' ? 'রিজার্ভ (পুরো গাড়ি)' : 'শেয়ার্ড')
   const vehicleLabel = (v) => (v === 'auto' ? 'অটো' : 'সিএনজি')
+
+    if (ratingRide) {
+    return (
+      <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
+        <h1>Rate Your Trip</h1>
+        <p>{ratingRide.pickup} → {ratingRide.destination}</p>
+        <p><b>Fare paid:</b> ৳{ratingRide.fare}</p>
+
+        {!ratingSubmitted ? (
+          <>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <span key={n} onClick={() => setStars(n)} style={{ cursor: 'pointer', color: n <= stars ? '#f5a623' : '#ccc' }}>
+                  ★
+                </span>
+              ))}
+            </div>
+            <textarea
+              placeholder="Any comments? (optional)"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              style={{ width: '100%', padding: 8, marginBottom: 12, minHeight: 80 }}
+            />
+            <button onClick={handleSubmitRating} disabled={loading || !stars} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
+              {loading ? 'Submitting...' : 'Submit Rating'}
+            </button>
+            <button onClick={closeRating} style={{ padding: 8, width: '100%', background: 'none', border: 'none', color: '#888', textDecoration: 'underline' }}>
+              Skip
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ color: 'green' }}>✅ Thanks for your feedback!</p>
+            <button onClick={closeRating} style={{ padding: 10, width: '100%' }}>Done</button>
+          </>
+        )}
+      </div>
+    )
+  }
 
   if (activeRide) {
     return (

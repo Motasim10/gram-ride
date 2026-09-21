@@ -27,11 +27,12 @@ export default function Dashboard() {
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <h1>Welcome, {profile.name}! 🎉</h1>
       <p>You're logged in as a {profile.role}.</p>
-      {profile.role === 'passenger' ? (
+            {profile.role === 'passenger' ? (
         <Link href="/passenger"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>Request a Ride</button></Link>
       ) : (
         <Link href="/driver"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>View Ride Requests</button></Link>
       )}
+      <Link href="/history"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>Trip History</button></Link>
     </div>
   )
 }

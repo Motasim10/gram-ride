@@ -16,6 +16,7 @@ export default function DriverPage() {
   const [finalOfferAmount, setFinalOfferAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirmingComplete, setConfirmingComplete] = useState(false)
   const router = useRouter()
   const ridesChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
@@ -170,15 +171,16 @@ export default function DriverPage() {
     setLoading(false)
   }
 
-  const handleComplete = async () => {
+    const handleComplete = async () => {
     setLoading(true)
     await supabase.from('rides').update({ status: 'completed' }).eq('id', activeRide.id)
     setActiveRide(null)
+    setConfirmingComplete(false)
     setLoading(false)
     refreshAll(userId)
   }
 
-  if (activeRide) {
+    if (activeRide) {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
         <h1>Your Active Ride</h1>
@@ -188,9 +190,23 @@ export default function DriverPage() {
         <p><b>Vehicle:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
         <p><b>{activeRide.ride_type === 'reserve' ? 'People traveling' : 'Seats'}:</b> {activeRide.seats}</p>
         <p><b>Fare:</b> ৳{activeRide.fare}</p>
-        <button onClick={handleComplete} disabled={loading} style={{ padding: 10, width: '100%', marginTop: 12 }}>
-          {loading ? 'Completing...' : 'Complete Trip'}
-        </button>
+
+        {!confirmingComplete ? (
+          <button onClick={() => setConfirmingComplete(true)} style={{ padding: 10, width: '100%', marginTop: 12 }}>
+            Complete Trip
+          </button>
+        ) : (
+          <div style={{ marginTop: 12, border: '1px solid #ccc', padding: 12, borderRadius: 8 }}>
+            <p><b>Confirm cash received: ৳{activeRide.fare}?</b></p>
+            <p style={{ color: '#888', fontSize: 13 }}>Did you receive ৳{activeRide.fare} in cash from the passenger?</p>
+            <button onClick={handleComplete} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
+              {loading ? 'Confirming...' : `Yes, I received ৳${activeRide.fare}`}
+            </button>
+            <button onClick={() => setConfirmingComplete(false)} disabled={loading} style={{ padding: 8, width: '100%' }}>
+              No, go back
+            </button>
+          </div>
+        )}
       </div>
     )
   }
