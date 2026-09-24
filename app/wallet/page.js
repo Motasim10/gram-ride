@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/lib/i18n'
 
 export default function WalletPage() {
+  const { t } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [totalEarnings, setTotalEarnings] = useState(0)
   const [totalTrips, setTotalTrips] = useState(0)
@@ -42,33 +44,33 @@ export default function WalletPage() {
     load()
   }, [])
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+    if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Wallet & Stats</h1>
+      <h1>{t('walletStatsTitle')}</h1>
 
       <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Total Earnings</p>
+        <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('totalEarnings')}</p>
         <p style={{ fontSize: 28, fontWeight: 'bold', margin: '4px 0' }}>৳{totalEarnings}</p>
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Total Trips</p>
+          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('totalTrips')}</p>
           <p style={{ fontSize: 20, fontWeight: 'bold', margin: '4px 0' }}>{totalTrips}</p>
         </div>
         <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Rating</p>
+          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('rating')}</p>
           <p style={{ fontSize: 20, fontWeight: 'bold', margin: '4px 0' }}>
-            {avgRating ? `★ ${avgRating}` : 'No ratings yet'}
+            {avgRating ? `★ ${avgRating}` : t('noRatingsYet')}
           </p>
-          {avgRating && <p style={{ fontSize: 11, color: '#888', margin: 0 }}>({ratingCount} rating{ratingCount !== 1 ? 's' : ''})</p>}
+          {avgRating && <p style={{ fontSize: 11, color: '#888', margin: 0 }}>({ratingCount} {t('ratingsCount')})</p>}
         </div>
       </div>
 
       <p style={{ fontSize: 13, color: '#888', textAlign: 'center', marginTop: 24 }}>
-        Cash payouts and subscription billing aren't set up yet — this screen shows your real trip and rating stats today.
+        {t('walletNote')}
       </p>
     </div>
   )

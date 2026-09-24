@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/lib/i18n'
 
 export default function SignUp() {
   const [name, setName] = useState('')
@@ -12,6 +13,7 @@ export default function SignUp() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { t } = useLanguage()
 
   const handleSignUp = async (e) => {
     e.preventDefault()
@@ -45,34 +47,34 @@ export default function SignUp() {
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Create Account</h1>
+      <h1>{t('createAccountTitle')}</h1>
       <form onSubmit={handleSignUp}>
         <div style={{ marginBottom: 12 }}>
-          <label>Name</label><br/>
+          <label>{t('name')}</label><br/>
           <input value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Phone</label><br/>
+          <label>{t('phone')}</label><br/>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Email</label><br/>
+          <label>{t('email')}</label><br/>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Password</label><br/>
+          <label>{t('password')}</label><br/>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>I am a:</label><br/>
+          <label>{t('iAmA')}</label><br/>
           <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: '100%', padding: 8 }}>
-            <option value="passenger">Passenger</option>
-            <option value="driver">Driver</option>
+            <option value="passenger">{t('passenger')}</option>
+            <option value="driver">{t('driver')}</option>
           </select>
         </div>
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>
-          {loading ? 'Creating account...' : 'Create Account'}
+          {loading ? t('creatingAccount') : t('createAccountButton')}
         </button>
       </form>
     </div>

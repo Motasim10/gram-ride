@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useLanguage } from '@/lib/i18n'
 
 export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useLanguage()
 
   const attemptLogin = async (email, password) => {
     setError('')
@@ -37,19 +39,19 @@ export default function Login() {
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Log In</h1>
+      <h1>{t('login')}</h1>
       <form onSubmit={handleLogin}>
         <div style={{ marginBottom: 12 }}>
-          <label>Email</label><br/>
+          <label>{t('email')}</label><br/>
           <input name="email" type="email" required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Password</label><br/>
+          <label>{t('password')}</label><br/>
           <input name="password" type="password" required style={{ width: '100%', padding: 8 }} />
         </div>
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>
-          {loading ? 'Logging in...' : 'Log In'}
+          {loading ? t('loggingIn') : t('logInButton')}
         </button>
       </form>
     </div>

@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-
-const typeLabel = (t) => (t === 'reserve' ? 'রিজার্ভ (পুরো গাড়ি)' : 'শেয়ার্ড')
-const vehicleLabel = (v) => (v === 'auto' ? 'অটো' : 'সিএনজি')
+import { useLanguage } from '@/lib/i18n'
 
 export default function HistoryPage() {
+  const { t } = useLanguage()
+  const typeLabel = (rt) => (rt === 'reserve' ? t('reserve') : t('shared'))
+  const vehicleLabel = (v) => (v === 'auto' ? t('auto2') : t('cng5'))
   const [trips, setTrips] = useState([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -31,17 +32,17 @@ export default function HistoryPage() {
 
   const totalFare = trips.reduce((sum, t) => sum + (t.fare || 0), 0)
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+    if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Trip History</h1>
+      <h1>{t('tripHistoryTitle')}</h1>
       <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <div><b>Total Trips</b><br/>{trips.length}</div>
-        <div><b>Total Fare</b><br/>৳{totalFare}</div>
+        <div><b>{t('totalTrips')}</b><br/>{trips.length}</div>
+        <div><b>{t('fare')}</b><br/>৳{totalFare}</div>
       </div>
 
-      {trips.length === 0 && <p style={{ color: '#888' }}>No completed trips yet.</p>}
+      {trips.length === 0 && <p style={{ color: '#888' }}>{t('noCompletedTrips')}</p>}
 
       {trips.map((t) => (
         <div key={t.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 10 }}>

@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { notify } from '@/lib/notify'
+import { useLanguage } from '@/lib/i18n'
 
 const CAPACITY = { cng: 5, auto: 2 }
 
@@ -21,9 +23,11 @@ export default function PassengerPage() {
   const [ratingSubmitted, setRatingSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isFlagged, setIsFlagged] = useState(false)
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
+  const { t } = useLanguage()
 
   const capacity = CAPACITY[vehicleType]
 
@@ -32,6 +36,10 @@ export default function PassengerPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+
+      const { data: profile } = await supabase.from('profiles').select('flagged').eq('user_id', user.id).single()
+      setIsFlagged(profile?.flagged || false)
+
       await checkActiveRide(user.id)
       subscribeToRideChanges(user.id)
     }
@@ -79,13 +87,13 @@ export default function PassengerPage() {
       .channel('passenger-rides-' + uid + '-' + Math.random().toString(36).slice(2))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rides', filter: `passenger_id=eq.${uid}` }, (payload) => {
         if (payload.eventType === 'DELETE') return
-                if (payload.new.status === 'completed') {
+        if (payload.new.status === 'completed') {
           setRatingRide(payload.new)
           setActiveRide(null)
           setPickup('')
           setDestination('')
           setSeats(1)
-                } else {
+        } else {
           setActiveRide(payload.new)
         }
       })
@@ -100,6 +108,7 @@ export default function PassengerPage() {
 
   const handleRequest = async (e) => {
     e.preventDefault()
+    if (isFlagged) { setError('Your account has been flagged and cannot request rides right now. Contact support.'); return }
     setError('')
     setLoading(true)
     const { data, error: insertError } = await supabase
@@ -120,6 +129,7 @@ export default function PassengerPage() {
     setLoading(true); setError('')
     const { error: updateError } = await supabase.from('rides')
       .update({ status: 'accepted', fare: latestBid.amount }).eq('id', activeRide.id).eq('passenger_id', userId)
+    if (!updateError) await notify(activeRide.driver_id, 'rideConfirmedForDriver', { amount: latestBid.amount })
     if (updateError) setError(updateError.message)
     setLoading(false)
   }
@@ -132,6 +142,7 @@ export default function PassengerPage() {
     const { error: bidError } = await supabase.from('bids').insert({
       ride_id: activeRide.id, driver_id: activeRide.driver_id, amount: Number(counterAmount), by: 'passenger', status: 'pending',
     })
+    if (!bidError) await notify(activeRide.driver_id, 'countered', { amount: counterAmount })
     if (bidError) setError(bidError.message)
     setCounterAmount('')
     setLoading(false)
@@ -139,15 +150,17 @@ export default function PassengerPage() {
 
   const handleCancelRide = async () => {
     setLoading(true); setError('')
+    const previousDriverId = activeRide.driver_id
     await supabase.from('bids').delete().eq('ride_id', activeRide.id)
     setBids([])
     const { error: updateError } = await supabase.from('rides')
       .update({ status: 'searching', driver_id: null }).eq('id', activeRide.id).eq('passenger_id', userId)
+    if (!updateError && previousDriverId) await notify(previousDriverId, 'cancelled', {})
     if (updateError) setError(updateError.message)
     setLoading(false)
   }
 
-    const handleSubmitRating = async () => {
+  const handleSubmitRating = async () => {
     if (!stars) return
     setLoading(true)
     await supabase.from('ratings').insert({
@@ -157,6 +170,7 @@ export default function PassengerPage() {
       stars,
       comment,
     })
+    await notify(ratingRide.driver_id, 'ratingReceived', { stars })
     setRatingSubmitted(true)
     setLoading(false)
   }
@@ -168,15 +182,15 @@ export default function PassengerPage() {
     setRatingSubmitted(false)
   }
 
-  const typeLabel = (t) => (t === 'reserve' ? 'রিজার্ভ (পুরো গাড়ি)' : 'শেয়ার্ড')
-  const vehicleLabel = (v) => (v === 'auto' ? 'অটো' : 'সিএনজি')
+  const typeLabel = (rt) => (rt === 'reserve' ? t('reserve') : t('shared'))
+  const vehicleLabel = (v) => (v === 'auto' ? t('auto2') : t('cng5'))
 
-    if (ratingRide) {
+  if (ratingRide) {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-        <h1>Rate Your Trip</h1>
+        <h1>{t('rateYourTrip')}</h1>
         <p>{ratingRide.pickup} → {ratingRide.destination}</p>
-        <p><b>Fare paid:</b> ৳{ratingRide.fare}</p>
+        <p><b>{t('farePaid')}:</b> ৳{ratingRide.fare}</p>
 
         {!ratingSubmitted ? (
           <>
@@ -188,22 +202,22 @@ export default function PassengerPage() {
               ))}
             </div>
             <textarea
-              placeholder="Any comments? (optional)"
+              placeholder={t('anyComments')}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               style={{ width: '100%', padding: 8, marginBottom: 12, minHeight: 80 }}
             />
             <button onClick={handleSubmitRating} disabled={loading || !stars} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-              {loading ? 'Submitting...' : 'Submit Rating'}
+              {loading ? t('submitting') : t('submitRating')}
             </button>
             <button onClick={closeRating} style={{ padding: 8, width: '100%', background: 'none', border: 'none', color: '#888', textDecoration: 'underline' }}>
-              Skip
+              {t('skip')}
             </button>
           </>
         ) : (
           <>
-            <p style={{ color: 'green' }}>✅ Thanks for your feedback!</p>
-            <button onClick={closeRating} style={{ padding: 10, width: '100%' }}>Done</button>
+            <p style={{ color: 'green' }}>✅ {t('thanksForFeedback')}</p>
+            <button onClick={closeRating} style={{ padding: 10, width: '100%' }}>{t('done')}</button>
           </>
         )}
       </div>
@@ -213,16 +227,16 @@ export default function PassengerPage() {
   if (activeRide) {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-        <h1>Your Ride</h1>
-        <p><b>From:</b> {activeRide.pickup}</p>
-        <p><b>To:</b> {activeRide.destination}</p>
-        <p><b>Type:</b> {typeLabel(activeRide.ride_type)}</p>
-        <p><b>Vehicle:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
-        <p><b>{activeRide.ride_type === 'reserve' ? 'People traveling' : 'Seats'}:</b> {activeRide.seats}</p>
-        <p><b>Status:</b> {activeRide.status}</p>
+        <h1>{t('yourRide')}</h1>
+        <p><b>{t('from')}:</b> {activeRide.pickup}</p>
+        <p><b>{t('to')}:</b> {activeRide.destination}</p>
+        <p><b>{t('type')}:</b> {typeLabel(activeRide.ride_type)}</p>
+        <p><b>{t('vehicle')}:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
+        <p><b>{activeRide.ride_type === 'reserve' ? t('peopleTraveling') : t('seats')}:</b> {activeRide.seats}</p>
+        <p><b>{t('status')}:</b> {t(activeRide.status)}</p>
 
         {activeRide.status === 'searching' && (
-          <p style={{ color: '#888', marginTop: 20 }}>Waiting for a driver to send a fare quote...</p>
+          <p style={{ color: '#888', marginTop: 20 }}>{t('waitingForQuote')}</p>
         )}
 
         {activeRide.status === 'negotiating' && (
@@ -231,81 +245,89 @@ export default function PassengerPage() {
 
             {bids.length === 1 && (
               <>
-                <p><b>Driver quoted:</b> ৳{latestBid.amount}</p>
+                <p><b>{t('driverQuoted')}:</b> ৳{latestBid.amount}</p>
                 <button onClick={handleAcceptBid} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-                  Accept ৳{latestBid.amount}
+                  {t('accept')} ৳{latestBid.amount}
                 </button>
                 <form onSubmit={handleCounter}>
-                  <input type="number" placeholder="Your counter-offer (৳)" value={counterAmount}
+                  <input type="number" placeholder={t('yourCounterOffer')} value={counterAmount}
                     onChange={(e) => setCounterAmount(e.target.value)} style={{ width: '100%', padding: 8, marginBottom: 8 }} />
-                  <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>Send Counter-Offer</button>
+                  <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>{t('sendCounterOffer')}</button>
                 </form>
               </>
             )}
 
             {bids.length === 2 && (
               <>
-                <p><b>You offered:</b> ৳{latestBid.amount}</p>
-                <p style={{ color: '#888' }}>Waiting for the driver's response...</p>
+                <p><b>{t('youOffered')}:</b> ৳{latestBid.amount}</p>
+                <p style={{ color: '#888' }}>{t('waitingForDriverResponse')}</p>
               </>
             )}
 
             {bids.length >= 3 && (
               <>
-                <p><b>Driver's final offer:</b> ৳{latestBid.amount}</p>
-                <p style={{ color: '#888', fontSize: 13 }}>This is the driver's final price — accept it, or cancel and look for another driver.</p>
+                <p><b>{t('driversFinalOffer')}:</b> ৳{latestBid.amount}</p>
+                <p style={{ color: '#888', fontSize: 13 }}>{t('finalOfferNote')}</p>
                 <button onClick={handleAcceptBid} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-                  Accept ৳{latestBid.amount}
+                  {t('accept')} ৳{latestBid.amount}
                 </button>
                 <button onClick={handleCancelRide} disabled={loading} style={{ padding: 10, width: '100%' }}>
-                  Cancel &amp; Find Another Driver
+                  {t('cancelFindAnother')}
                 </button>
               </>
             )}
           </div>
         )}
 
-        {activeRide.status === 'accepted' && <p style={{ color: 'green', marginTop: 20 }}>✅ Confirmed at ৳{activeRide.fare}</p>}
+        {activeRide.status === 'accepted' && <p style={{ color: 'green', marginTop: 20 }}>✅ {t('confirmedAt')} ৳{activeRide.fare}</p>}
       </div>
     )
   }
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Request a Ride</h1>
+      <h1>{t('requestRideTitle')}</h1>
+      {isFlagged && (
+        <div style={{ background: '#fff5f5', border: '1px solid #f5c6c6', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          <p style={{ margin: 0, color: '#c00', fontWeight: 'bold' }}>⚠️ Account Flagged</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#c00' }}>
+            Your account has been flagged by an admin and cannot request new rides right now. Please contact support.
+          </p>
+        </div>
+      )}
       <form onSubmit={handleRequest}>
         <div style={{ marginBottom: 12 }}>
-          <label>Ride Type</label><br/>
+          <label>{t('rideType')}</label><br/>
           <button type="button" onClick={() => setRideType('shared')}
-            style={{ padding: 8, marginRight: 8, fontWeight: rideType === 'shared' ? 'bold' : 'normal' }}>শেয়ার্ড</button>
+            style={{ padding: 8, marginRight: 8, fontWeight: rideType === 'shared' ? 'bold' : 'normal' }}>{t('shared')}</button>
           <button type="button" onClick={() => setRideType('reserve')}
-            style={{ padding: 8, fontWeight: rideType === 'reserve' ? 'bold' : 'normal' }}>রিজার্ভ (পুরো গাড়ি)</button>
+            style={{ padding: 8, fontWeight: rideType === 'reserve' ? 'bold' : 'normal' }}>{t('reserve')}</button>
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Vehicle</label><br/>
+          <label>{t('vehicle')}</label><br/>
           <button type="button" onClick={() => handleSelectVehicle('cng')}
-            style={{ padding: 8, marginRight: 8, fontWeight: vehicleType === 'cng' ? 'bold' : 'normal' }}>সিএনজি (5 seats)</button>
+            style={{ padding: 8, marginRight: 8, fontWeight: vehicleType === 'cng' ? 'bold' : 'normal' }}>{t('cng5')}</button>
           <button type="button" onClick={() => handleSelectVehicle('auto')}
-            style={{ padding: 8, fontWeight: vehicleType === 'auto' ? 'bold' : 'normal' }}>অটো (2 seats)</button>
+            style={{ padding: 8, fontWeight: vehicleType === 'auto' ? 'bold' : 'normal' }}>{t('auto2')}</button>
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Pickup</label><br/>
+          <label>{t('pickup')}</label><br/>
           <input value={pickup} onChange={(e) => setPickup(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>Destination</label><br/>
+          <label>{t('destination')}</label><br/>
           <input value={destination} onChange={(e) => setDestination(e.target.value)} required style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>{rideType === 'reserve' ? 'How many people are traveling?' : 'Seats needed'}</label><br/>
+          <label>{rideType === 'reserve' ? t('peopleTraveling') : t('seatsNeeded')}</label><br/>
           <input type="number" min="1" max={capacity} value={seats}
             onChange={(e) => setSeats(Math.min(capacity, Math.max(1, Number(e.target.value))))}
             style={{ width: '100%', padding: 8 }} />
-          <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Max {capacity} for {vehicleLabel(vehicleType)}</p>
+          <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{t('maxFor')} {capacity} {vehicleLabel(vehicleType)}</p>
         </div>
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>
-          {loading ? 'Requesting...' : 'Find a Ride'}
+          {loading ? t('requesting') : t('findRide')}
         </button>
       </form>
     </div>

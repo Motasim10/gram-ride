@@ -2,9 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-
-const typeLabel = (t) => (t === 'reserve' ? 'রিজার্ভ (পুরো গাড়ি)' : 'শেয়ার্ড')
-const vehicleLabel = (v) => (v === 'auto' ? 'অটো' : 'সিএনজি')
+import { notify } from '@/lib/notify'
+import { useLanguage } from '@/lib/i18n'
 
 export default function DriverPage() {
   const [userId, setUserId] = useState(null)
@@ -14,19 +13,28 @@ export default function DriverPage() {
   const [bids, setBids] = useState([])
   const [quoteInputs, setQuoteInputs] = useState({})
   const [finalOfferAmount, setFinalOfferAmount] = useState('')
+  const [confirmingComplete, setConfirmingComplete] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [confirmingComplete, setConfirmingComplete] = useState(false)
+  const [isFlagged, setIsFlagged] = useState(false)
   const router = useRouter()
   const ridesChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
   const negotiatingRideIdRef = useRef(null)
+  const { t } = useLanguage()
 
-  useEffect(() => {
+  const typeLabel = (rt) => (rt === 'reserve' ? t('reserve') : t('shared'))
+  const vehicleLabel = (v) => (v === 'auto' ? t('auto2') : t('cng5'))
+
+    useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+
+      const { data: profile } = await supabase.from('profiles').select('flagged').eq('user_id', user.id).single()
+      setIsFlagged(profile?.flagged || false)
+
       await refreshAll(user.id)
       subscribeToRideChanges(user.id)
     }
@@ -111,6 +119,7 @@ export default function DriverPage() {
   }
 
   const handleSendQuote = async (ride) => {
+    if (isFlagged) { setError('Your account has been flagged and cannot accept rides right now. Contact support.'); return }
     const amount = Number(quoteInputs[ride.id])
     if (!amount || amount <= 0) { setError('Enter a valid fare amount first.'); return }
     setLoading(true); setError('')
@@ -126,6 +135,7 @@ export default function DriverPage() {
     }
 
     await supabase.from('bids').insert({ ride_id: ride.id, driver_id: userId, amount, by: 'driver', status: 'pending' })
+    await notify(ride.passenger_id, 'quoted', { amount, destination: ride.destination })
     setRequests((prev) => prev.filter((r) => r.id !== ride.id))
     setNegotiatingRide(data)
     setLoading(false)
@@ -137,6 +147,7 @@ export default function DriverPage() {
     setLoading(true); setError('')
     const { error: updateError } = await supabase.from('rides')
       .update({ status: 'accepted', fare: latestBid.amount }).eq('id', negotiatingRide.id).eq('driver_id', userId)
+    if (!updateError) await notify(negotiatingRide.passenger_id, 'rideConfirmedForPassenger', { amount: latestBid.amount })
     if (updateError) setError(updateError.message)
     setLoading(false)
   }
@@ -148,6 +159,7 @@ export default function DriverPage() {
     const { error: bidError } = await supabase.from('bids').insert({
       ride_id: negotiatingRide.id, driver_id: userId, amount, by: 'driver', status: 'pending',
     })
+    if (!bidError) await notify(negotiatingRide.passenger_id, 'finalOffer', { amount })
     if (bidError) setError(bidError.message)
     setFinalOfferAmount('')
     setLoading(false)
@@ -171,39 +183,40 @@ export default function DriverPage() {
     setLoading(false)
   }
 
-    const handleComplete = async () => {
+  const handleComplete = async () => {
     setLoading(true)
     await supabase.from('rides').update({ status: 'completed' }).eq('id', activeRide.id)
+    await notify(activeRide.passenger_id, 'tripComplete', { destination: activeRide.destination, amount: activeRide.fare })
     setActiveRide(null)
     setConfirmingComplete(false)
     setLoading(false)
     refreshAll(userId)
   }
 
-    if (activeRide) {
+  if (activeRide) {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-        <h1>Your Active Ride</h1>
-        <p><b>From:</b> {activeRide.pickup}</p>
-        <p><b>To:</b> {activeRide.destination}</p>
-        <p><b>Type:</b> {typeLabel(activeRide.ride_type)}</p>
-        <p><b>Vehicle:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
-        <p><b>{activeRide.ride_type === 'reserve' ? 'People traveling' : 'Seats'}:</b> {activeRide.seats}</p>
-        <p><b>Fare:</b> ৳{activeRide.fare}</p>
+        <h1>{t('yourActiveRide')}</h1>
+        <p><b>{t('from')}:</b> {activeRide.pickup}</p>
+        <p><b>{t('to')}:</b> {activeRide.destination}</p>
+        <p><b>{t('type')}:</b> {typeLabel(activeRide.ride_type)}</p>
+        <p><b>{t('vehicle')}:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
+        <p><b>{activeRide.ride_type === 'reserve' ? t('peopleTraveling') : t('seats')}:</b> {activeRide.seats}</p>
+        <p><b>{t('fare')}:</b> ৳{activeRide.fare}</p>
 
         {!confirmingComplete ? (
           <button onClick={() => setConfirmingComplete(true)} style={{ padding: 10, width: '100%', marginTop: 12 }}>
-            Complete Trip
+            {t('completeTrip')}
           </button>
         ) : (
           <div style={{ marginTop: 12, border: '1px solid #ccc', padding: 12, borderRadius: 8 }}>
-            <p><b>Confirm cash received: ৳{activeRide.fare}?</b></p>
-            <p style={{ color: '#888', fontSize: 13 }}>Did you receive ৳{activeRide.fare} in cash from the passenger?</p>
+            <p><b>{t('confirmCashReceived')}{activeRide.fare}?</b></p>
+            <p style={{ color: '#888', fontSize: 13 }}>{t('didYouReceive')}{activeRide.fare} {t('inCash')}</p>
             <button onClick={handleComplete} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-              {loading ? 'Confirming...' : `Yes, I received ৳${activeRide.fare}`}
+              {loading ? t('completing') : `${t('yesReceived')}${activeRide.fare}`}
             </button>
             <button onClick={() => setConfirmingComplete(false)} disabled={loading} style={{ padding: 8, width: '100%' }}>
-              No, go back
+              {t('noGoBack')}
             </button>
           </div>
         )}
@@ -214,43 +227,43 @@ export default function DriverPage() {
   if (negotiatingRide) {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-        <h1>Negotiating</h1>
-        <p><b>From:</b> {negotiatingRide.pickup}</p>
-        <p><b>To:</b> {negotiatingRide.destination}</p>
-        <p><b>Type:</b> {typeLabel(negotiatingRide.ride_type)}</p>
-        <p><b>Vehicle:</b> {vehicleLabel(negotiatingRide.vehicle_type)}</p>
-        <p><b>{negotiatingRide.ride_type === 'reserve' ? 'People traveling' : 'Seats'}:</b> {negotiatingRide.seats}</p>
+        <h1>{t('negotiatingTitle')}</h1>
+        <p><b>{t('from')}:</b> {negotiatingRide.pickup}</p>
+        <p><b>{t('to')}:</b> {negotiatingRide.destination}</p>
+        <p><b>{t('type')}:</b> {typeLabel(negotiatingRide.ride_type)}</p>
+        <p><b>{t('vehicle')}:</b> {vehicleLabel(negotiatingRide.vehicle_type)}</p>
+        <p><b>{negotiatingRide.ride_type === 'reserve' ? t('peopleTraveling') : t('seats')}:</b> {negotiatingRide.seats}</p>
         {error && <p style={{ color: 'red' }}>{error}</p>}
 
         {bids.length === 1 && (
           <>
-            <p><b>You quoted:</b> ৳{latestBid.amount}</p>
-            <p style={{ color: '#888' }}>Waiting for the passenger's response...</p>
+            <p><b>{t('youQuoted')}:</b> ৳{latestBid.amount}</p>
+            <p style={{ color: '#888' }}>{t('waitingForPassengerResponse')}</p>
           </>
         )}
 
         {bids.length === 2 && (
           <>
-            <p><b>Passenger countered:</b> ৳{latestBid.amount}</p>
+            <p><b>{t('passengerCountered')}:</b> ৳{latestBid.amount}</p>
             <button onClick={handleAcceptCounter} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-              Accept ৳{latestBid.amount}
+              {t('accept')} ৳{latestBid.amount}
             </button>
-            <input type="number" placeholder="Your final offer (৳)" value={finalOfferAmount}
+            <input type="number" placeholder={t('yourFinalOffer')} value={finalOfferAmount}
               onChange={(e) => setFinalOfferAmount(e.target.value)} style={{ width: '100%', padding: 8, marginBottom: 8 }} />
             <button onClick={handleSendFinalOffer} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-              Send Final Offer
+              {t('sendFinalOffer')}
             </button>
             <button onClick={handleRejectCounter} disabled={loading}
               style={{ padding: 8, width: '100%', background: 'none', border: 'none', color: '#888', textDecoration: 'underline' }}>
-              Not interested — release ride
+              {t('notInterestedRelease')}
             </button>
           </>
         )}
 
         {bids.length >= 3 && (
           <>
-            <p><b>You sent final offer:</b> ৳{latestBid.amount}</p>
-            <p style={{ color: '#888' }}>Waiting for the passenger's decision...</p>
+            <p><b>{t('youSentFinalOffer')}:</b> ৳{latestBid.amount}</p>
+            <p style={{ color: '#888' }}>{t('waitingForPassengerDecision')}</p>
           </>
         )}
       </div>
@@ -259,22 +272,30 @@ export default function DriverPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Ride Requests</h1>
-      <p style={{ color: '#888', fontSize: 13 }}>Send a fare quote to claim a request.</p>
+      <h1>{t('rideRequestsTitle')}</h1>
+      {isFlagged && (
+        <div style={{ background: '#fff5f5', border: '1px solid #f5c6c6', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          <p style={{ margin: 0, color: '#c00', fontWeight: 'bold' }}>⚠️ Account Flagged</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#c00' }}>
+            Your account has been flagged by an admin and cannot accept new rides right now. Please contact support.
+          </p>
+        </div>
+      )}
+      <p style={{ color: '#888', fontSize: 13 }}>{t('sendQuoteNote')}</p>
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      {requests.length === 0 && <p>No requests waiting right now.</p>}
+      {requests.length === 0 && <p>{t('noRequestsWaiting')}</p>}
       {requests.map((r) => (
         <div key={r.id} style={{ border: '1px solid #ccc', padding: 12, marginBottom: 12, borderRadius: 8 }}>
-          <p><b>From:</b> {r.pickup}</p>
-          <p><b>To:</b> {r.destination}</p>
-          <p><b>Type:</b> {typeLabel(r.ride_type)}</p>
-          <p><b>Vehicle:</b> {vehicleLabel(r.vehicle_type)}</p>
-          <p><b>{r.ride_type === 'reserve' ? 'People traveling' : 'Seats'}:</b> {r.seats}</p>
-          <input type="number" placeholder="Your fare quote (৳)" value={quoteInputs[r.id] || ''}
+          <p><b>{t('from')}:</b> {r.pickup}</p>
+          <p><b>{t('to')}:</b> {r.destination}</p>
+          <p><b>{t('type')}:</b> {typeLabel(r.ride_type)}</p>
+          <p><b>{t('vehicle')}:</b> {vehicleLabel(r.vehicle_type)}</p>
+          <p><b>{r.ride_type === 'reserve' ? t('peopleTraveling') : t('seats')}:</b> {r.seats}</p>
+          <input type="number" placeholder={t('yourFareQuote')} value={quoteInputs[r.id] || ''}
             onChange={(e) => setQuoteInputs((prev) => ({ ...prev, [r.id]: e.target.value }))}
             style={{ width: '100%', padding: 8, marginBottom: 8 }} />
           <button onClick={() => handleSendQuote(r)} disabled={loading} style={{ padding: 8, width: '100%' }}>
-            Send Quote
+            {t('sendQuote')}
           </button>
         </div>
       ))}
