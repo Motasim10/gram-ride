@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 
+
 export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
