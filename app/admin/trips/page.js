@@ -62,7 +62,7 @@ export default function AdminTripsPage() {
   const forceOffline = async (trip) => {
     if (!window.confirm(`Force "${trip.driver.name || trip.driver_id}" offline from ${trip.routeName}?`)) return
     const { data: released } = await supabase.from('rides')
-      .update({ status: 'searching', driver_id: null, trip_id: null })
+      .update({ status: 'searching', driver_id: null, trip_id: null, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
       .eq('trip_id', trip.id).eq('status', 'accepted').select()
     for (const r of released || []) await notify(r.passenger_id, 'tripCancelledByDriver', {})
     await supabase.from('trips').update({ status: 'cancelled' }).eq('id', trip.id).select()

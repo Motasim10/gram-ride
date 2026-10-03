@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n'
 import NotificationBell from '@/lib/NotificationBell'
 
 const CAPACITY = { cng: 5, auto: 2 }
+const formatLeft = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 
 export default function PassengerPage() {
   const [userId, setUserId] = useState(null)
@@ -37,6 +38,13 @@ export default function PassengerPage() {
   const [pickupMode, setPickupMode] = useState('now')
   const [pickupTimeInput, setPickupTimeInput] = useState('')
   const [womenCount, setWomenCount] = useState(0)
+  const [waitMinutes, setWaitMinutes] = useState(10)
+  const [nowMs, setNowMs] = useState(Date.now())
+  useEffect(() => {
+    if (activeRide?.status !== 'searching') return
+    const timer = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [activeRide?.status])
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
@@ -186,6 +194,9 @@ export default function PassengerPage() {
 
     const womenSeats = rideType === 'shared' ? Number(womenCount) || 0 : 0
     if (rideType === 'shared' && (womenSeats < 0 || womenSeats > Number(seats) || womenSeats > (vehicleType === 'cng' ? 3 : 2))) { setError(t('womenCountInvalid')); return }
+    const expiresAtIso = (rideType === 'shared' || pickupMode === 'now')
+      ? new Date(Date.now() + Number(waitMinutes) * 60000).toISOString()
+      : null
 
     setError('')
     setSosSent(false)
@@ -204,12 +215,14 @@ export default function PassengerPage() {
               route_id: Number(routeId),
               pickup_pos: pickupStop.position, drop_pos: dropStop.position,
               women_seats: womenSeats,
+              expires_at: expiresAtIso,
             }
           : {
               passenger_id: userId, pickup, destination, seats: Number(seats),
               ride_type: rideType, vehicle_type: vehicleType, status: 'searching',
               fare: null,
               pickup_time: pickupTimeIso,
+              expires_at: expiresAtIso,
             }
       )
       .select().single()
@@ -250,7 +263,7 @@ export default function PassengerPage() {
     await supabase.from('bids').delete().eq('ride_id', activeRide.id)
     setBids([])
     const { error: updateError } = await supabase.from('rides')
-      .update({ status: 'searching', driver_id: null }).eq('id', activeRide.id).eq('passenger_id', userId)
+      .update({ status: 'searching', driver_id: null, expires_at: activeRide.pickup_time ? null : new Date(Date.now() + Number(waitMinutes) * 60000).toISOString() }).eq('id', activeRide.id).eq('passenger_id', userId)
     if (updateError) setError(updateError.message)
     setLoading(false)
   }
@@ -270,6 +283,15 @@ export default function PassengerPage() {
     setLoading(true); setError('')
     const { error: updateError } = await supabase.from('rides')
       .update({ status: 'cancelled' }).eq('id', activeRide.id).eq('passenger_id', userId)
+    if (updateError) setError(updateError.message)
+    setLoading(false)
+  }
+
+  const handleExtendWait = async () => {
+    setLoading(true); setError('')
+    const { error: updateError } = await supabase.from('rides')
+      .update({ expires_at: new Date(Date.now() + Number(waitMinutes) * 60000).toISOString() })
+      .eq('id', activeRide.id).eq('passenger_id', userId).eq('status', 'searching')
     if (updateError) setError(updateError.message)
     setLoading(false)
   }
@@ -437,9 +459,19 @@ export default function PassengerPage() {
 
         {activeRide.status === 'searching' && (
           <div style={{ marginTop: 20 }}>
-            <p style={{ color: '#888' }}>
-              {activeRide.ride_type === 'shared' ? t('waitingForAcceptShared') : t('waitingForQuote')}
-            </p>
+            {activeRide.expires_at && nowMs >= new Date(activeRide.expires_at).getTime() ? (
+              <>
+                <p style={{ color: '#c00', fontWeight: 'bold' }}>{t('noDriverFound')}</p>
+                <button onClick={handleExtendWait} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
+                  {t('keepWaiting')} {waitMinutes} {t('minutesShort')}
+                </button>
+              </>
+            ) : (
+              <p style={{ color: '#888' }}>
+                {activeRide.ride_type === 'shared' ? t('waitingForAcceptShared') : t('waitingForQuote')}
+                {activeRide.expires_at && ` · ${t('waitingTimeLeft')}: ${formatLeft(new Date(activeRide.expires_at).getTime() - nowMs)}`}
+              </p>
+            )}
             <button onClick={handleCancelSearching} disabled={loading} style={{ padding: 10, width: '100%' }}>
               {t('cancelRequest')}
             </button>
@@ -597,6 +629,15 @@ export default function PassengerPage() {
           ) : (
             <p style={{ fontSize: 13, color: '#c00', marginBottom: 12 }}>{t('routeNotAvailable')}</p>
           )
+        )}
+        {(rideType === 'shared' || pickupMode === 'now') && (
+          <div style={{ marginBottom: 12 }}>
+            <label>{t('waitTimeLabel')}</label><br/>
+            {[5, 10, 15].map((m) => (
+              <button key={m} type="button" onClick={() => setWaitMinutes(m)}
+                style={{ padding: 8, marginRight: 8, fontWeight: waitMinutes === m ? 'bold' : 'normal' }}>{m} {t('minutesShort')}</button>
+            ))}
+          </div>
         )}
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" disabled={loading || (rideType === 'shared' && (!pickupStopId || !dropStopId || !fixedFare))} style={{ padding: 10, width: '100%' }}>

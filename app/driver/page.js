@@ -8,6 +8,7 @@ import NotificationBell from '@/lib/NotificationBell'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
+const notExpired = (r) => !r.expires_at || new Date(r.expires_at).getTime() > Date.now()
 
 export default function DriverPage() {
   const [userId, setUserId] = useState(null)
@@ -129,6 +130,11 @@ export default function DriverPage() {
 
   useEffect(() => { isActiveDriverRef.current = !!activeTrip && activeTrip.status === 'open' }, [activeTrip?.id, activeTrip?.status])
   useEffect(() => { activeRouteIdRef.current = activeTrip ? Number(activeTrip.route_id) : null }, [activeTrip?.route_id])
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (queueChannelRef.current) { supabase.removeChannel(queueChannelRef.current); queueChannelRef.current = null }
@@ -316,7 +322,7 @@ export default function DriverPage() {
     await supabase.from('bids').delete().eq('ride_id', rideId)
     setBids([])
     const { error: updateError } = await supabase.from('rides')
-      .update({ status: 'searching', driver_id: null }).eq('id', rideId).eq('driver_id', userId)
+        .update({ status: 'searching', driver_id: null, expires_at: negotiatingRide.pickup_time ? null : new Date(Date.now() + 10 * 60 * 1000).toISOString() }).eq('id', rideId).eq('driver_id', userId)
     if (updateError) setError(updateError.message)
     setNegotiatingRide(null)
     setQuoteInputs((prev) => { const next = { ...prev }; delete next[rideId]; return next })
@@ -355,7 +361,7 @@ export default function DriverPage() {
       .eq('trip_id', activeTrip.id).eq('status', 'accepted')
     for (const r of toRelease || []) await notify(r.passenger_id, 'tripCancelledByDriver', {})
     await supabase.from('rides')
-      .update({ status: 'searching', driver_id: null, trip_id: null })
+      .update({ status: 'searching', driver_id: null, trip_id: null, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
       .eq('trip_id', activeTrip.id).eq('status', 'accepted')
     await supabase.from('trips').update({ status: 'cancelled' }).eq('id', activeTrip.id).select()
     setActiveTrip(null)
@@ -373,7 +379,7 @@ export default function DriverPage() {
     q.queue_pos < myPos &&
     Number(q.filled_seats) + ride.seats <= CAPACITY[q.vehicle_type] &&
     Number(q.women_seats) + (ride.women_seats || 0) <= BACK_SEATS[q.vehicle_type])
-  const visibleWaiting = waitingPassengers.filter((r) => !aheadCanFit(r))
+  const visibleWaiting = waitingPassengers.filter((r) => notExpired(r) && !aheadCanFit(r))
 
   const handleAcceptPassenger = async (ride) => {
     if (filledSeats + ride.seats > capacity) { setError('Not enough seats left for this passenger.'); return }
@@ -624,8 +630,8 @@ export default function DriverPage() {
         </div>
       ) : (
         <>
-          {reserveRequests.length === 0 && <p>{t('noRequestsWaiting')}</p>}
-          {reserveRequests.map((r) => (
+          {reserveRequests.filter(notExpired).length === 0 && <p>{t('noRequestsWaiting')}</p>}
+          {reserveRequests.filter(notExpired).map((r) => (
             <div key={r.id} style={{ border: '1px solid #ccc', padding: 12, marginBottom: 12, borderRadius: 8 }}>
               <p><b>{t('from')}:</b> {r.pickup}</p>
               <p><b>{t('to')}:</b> {r.destination}</p>
