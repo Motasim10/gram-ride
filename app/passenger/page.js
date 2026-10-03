@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { notify } from '@/lib/notify'
 import { useLanguage } from '@/lib/i18n'
+import NotificationBell from '@/lib/NotificationBell'
 
 const CAPACITY = { cng: 5, auto: 2 }
 
@@ -345,7 +346,10 @@ export default function PassengerPage() {
     return (
       <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1>{t('trackingTitle')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h1>{t('trackingTitle')}</h1>
+            <NotificationBell />
+          </div>
           {!showSosConfirm && !sosSent && (
             <button onClick={() => setShowSosConfirm(true)} style={{ padding: '8px 14px', background: '#c00', color: 'white', border: 'none', borderRadius: 6, fontWeight: 'bold' }}>
               🆘 {t('sos')}
@@ -472,7 +476,10 @@ export default function PassengerPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('requestRideTitle')}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <h1>{t('requestRideTitle')}</h1>
+        <NotificationBell />
+      </div>
       {isFlagged && (
         <div style={{ background: '#fff5f5', border: '1px solid #f5c6c6', borderRadius: 8, padding: 12, marginBottom: 16 }}>
           <p style={{ margin: 0, color: '#c00', fontWeight: 'bold' }}>⚠️ Account Flagged</p>

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { notify } from '@/lib/notify'
 import { useLanguage } from '@/lib/i18n'
+import NotificationBell from '@/lib/NotificationBell'
 
 const CAPACITY = { cng: 5, auto: 2 }
 
@@ -411,7 +412,10 @@ export default function DriverPage() {
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {/* ---------- Shared route / trip section ---------- */}
-      <h1>{t('rideRequestsTitle')}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <h1>{t('rideRequestsTitle')}</h1>
+        <NotificationBell />
+      </div>
 
       {!activeTrip && (
         <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 20 }}>
