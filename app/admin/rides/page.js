@@ -16,6 +16,7 @@ export default function AdminRidesPage() {
   const [loading, setLoading] = useState(true)
   const [rides, setRides] = useState([])
   const [profileMap, setProfileMap] = useState({})
+  const [routeMap, setRouteMap] = useState({})
   const router = useRouter()
   const channelRef = useRef(null)
 
@@ -32,6 +33,11 @@ export default function AdminRidesPage() {
       const map = {}
       ;(allProfiles || []).forEach((p) => { map[p.user_id] = p.name })
       setProfileMap(map)
+
+      const { data: routeRows } = await supabase.from('routes').select('id, name')
+      const rMap = {}
+      ;(routeRows || []).forEach((rt) => { rMap[rt.id] = rt.name })
+      setRouteMap(rMap)
 
       await loadRides()
       subscribe()
@@ -86,6 +92,12 @@ export default function AdminRidesPage() {
               <p style={{ margin: '2px 0', fontSize: 13, color: '#888' }}>
                 Passenger: {nameFor(r.passenger_id)} · Driver: {nameFor(r.driver_id)}
               </p>
+              {r.ride_type === 'shared' && (
+              <p style={{ margin: '2px 0', fontSize: 13 }}>
+                  Route: {routeMap[r.route_id] || '—'}{r.trip_id ? ` · Trip #${r.trip_id}` : ' · not yet on a trip'}
+              </p>
+              )}
+
               <p style={{ margin: '2px 0', fontSize: 13 }}>
                 {r.ride_type === 'reserve' ? 'Reserve' : 'Shared'} · {r.vehicle_type === 'auto' ? 'Auto' : 'CNG'} · Seats: {r.seats}
                 {r.fare ? ` · ৳${r.fare}` : ''}
