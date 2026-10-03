@@ -46,14 +46,17 @@ export default function Dashboard() {
     <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>{t('welcome')}, {profile.name}! 🎉</h1>
-        <Link href="/notifications" style={{ textDecoration: 'none', position: 'relative', fontSize: 24 }}>
-          🔔
-          {unreadCount > 0 && (
-            <span style={{ position: 'absolute', top: -4, right: -8, background: 'red', color: 'white', borderRadius: '50%', fontSize: 11, padding: '1px 5px' }}>
-              {unreadCount}
-            </span>
-          )}
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Link href="/profile" style={{ textDecoration: 'none', fontSize: 24 }}>👤</Link>
+          <Link href="/notifications" style={{ textDecoration: 'none', position: 'relative', fontSize: 24 }}>
+            🔔
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -8, background: 'red', color: 'white', borderRadius: '50%', fontSize: 11, padding: '1px 5px' }}>
+                {unreadCount}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
       <p>{t('loggedInAs')} {t(profile.role)}.</p>
       {profile.role === 'passenger' ? (
@@ -66,6 +69,7 @@ export default function Dashboard() {
       )}
       <Link href="/history"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('tripHistory')}</button></Link>
       <Link href="/complaints"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('complaints')}</button></Link>
+      <Link href="/help"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('helpSupport')}</button></Link>
     </div>
   )
 }

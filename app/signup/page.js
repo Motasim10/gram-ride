@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n'
 export default function SignUp() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [area, setArea] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('passenger')
@@ -32,6 +33,7 @@ export default function SignUp() {
       user_id: data.user.id,
       name,
       phone,
+      area,
       role,
     })
 
@@ -56,6 +58,10 @@ export default function SignUp() {
         <div style={{ marginBottom: 12 }}>
           <label>{t('phone')}</label><br/>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ width: '100%', padding: 8 }} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label>{t('areaLabel')}</label><br/>
+          <input value={area} onChange={(e) => setArea(e.target.value)} style={{ width: '100%', padding: 8 }} />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label>{t('email')}</label><br/>

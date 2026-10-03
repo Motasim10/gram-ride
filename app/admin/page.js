@@ -65,6 +65,13 @@ export default function AdminPage() {
         <a href="/admin/passengers"><button style={{ padding: 10 }}>Manage Passengers</button></a>
         <a href="/admin/rides"><button style={{ padding: 10 }}>Live Rides</button></a>
         <a href="/admin/disputes"><button style={{ padding: 10 }}>Disputes</button></a>
+        <a href="/admin/locations"><button style={{ padding: 10 }}>Locations</button></a>
+        <a href="/admin/fares"><button style={{ padding: 10 }}>Fares</button></a>
+        <a href="/admin/routes"><button style={{ padding: 10 }}>Routes & Fares</button></a>
+        <a href="/admin/analytics"><button style={{ padding: 10 }}>Analytics</button></a>
+        <a href="/admin/payouts"><button style={{ padding: 10 }}>Payouts</button></a>
+        <a href="/admin/sos" style={{ color: '#c00' }}><button style={{ padding: 10, borderColor: '#c00', color: '#c00' }}>🆘 SOS Alerts</button></a>
+        <a href="/admin/trips"><button style={{ padding: 10 }}>Active Trips</button></a>
       </div>
     </div>
   )

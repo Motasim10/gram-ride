@@ -46,8 +46,15 @@ export default function AdminRidesPage() {
       .from('rides')
       .select('*')
       .neq('status', 'completed')
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
     setRides(data || [])
+  }
+
+  const forceCancel = async (ride) => {
+    if (!window.confirm(`Force-cancel this ride (${ride.pickup} → ${ride.destination})?`)) return
+    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', ride.id).select()
+    await loadRides()
   }
 
   const subscribe = () => {
@@ -88,6 +95,7 @@ export default function AdminRidesPage() {
               {r.status}
             </span>
           </div>
+          <button onClick={() => forceCancel(r)} style={{ marginTop: 8, padding: '6px 12px', color: '#c00' }}>Force Cancel</button>
         </div>
       ))}
     </div>
