@@ -43,6 +43,7 @@ export default function DriverPage() {
   const isActiveDriverRef = useRef(false)
   const activeRouteIdRef = useRef(null)
   const [routeTrips, setRouteTrips] = useState([])
+  const [queueStatus, setQueueStatus] = useState([])
   const myTripChannelRef = useRef(null)
 
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function DriverPage() {
   const isActiveDriver = queueIndex === 0
   const queuePosition = queueIndex + 1
 
-  useEffect(() => { isActiveDriverRef.current = isActiveDriver }, [isActiveDriver])
+  useEffect(() => { isActiveDriverRef.current = !!activeTrip && activeTrip.status === 'open' }, [activeTrip?.id, activeTrip?.status])
   useEffect(() => { activeRouteIdRef.current = activeTrip ? Number(activeTrip.route_id) : null }, [activeTrip?.route_id])
 
   useEffect(() => {
@@ -143,9 +144,18 @@ export default function DriverPage() {
   }, [activeTrip?.id, activeTrip?.status])
 
   useEffect(() => {
-    if (!activeTrip || activeTrip.status !== 'open' || !isActiveDriver) { setWaitingPassengers([]); return }
+    if (!activeTrip || activeTrip.status !== 'open') { setWaitingPassengers([]); return }
     loadWaitingPassengers(activeTrip.route_id)
-  }, [activeTrip?.id, activeTrip?.status, isActiveDriver])
+  }, [activeTrip?.id, activeTrip?.status])
+
+  useEffect(() => {
+    if (!activeTrip || activeTrip.status !== 'open') return
+    const timer = setInterval(() => {
+      loadRouteQueue(activeTrip.route_id)
+      loadWaitingPassengers(activeTrip.route_id)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [activeTrip?.id, activeTrip?.status])
 
   useEffect(() => {
     if (bidsChannelRef.current) { supabase.removeChannel(bidsChannelRef.current); bidsChannelRef.current = null }
@@ -186,9 +196,11 @@ export default function DriverPage() {
   }
 
   const loadRouteQueue = async (routeId) => {
-    const { data } = await supabase.from('trips').select('id, created_at')
-      .eq('route_id', routeId).eq('status', 'open').order('created_at', { ascending: true })
-    setRouteTrips(data || [])
+    const { data, error: rpcError } = await supabase.rpc('route_queue_status', { p_route_id: routeId })
+    if (rpcError) { console.error(rpcError); return }
+    const rows = data || []
+    setQueueStatus(rows)
+    setRouteTrips(rows.map((q) => ({ id: q.trip_id })))
   }
 
   const loadTripPassengers = async (tripId) => {
@@ -356,6 +368,12 @@ export default function DriverPage() {
   const womenSeats = tripPassengers.reduce((sum, r) => sum + (r.women_seats || 0), 0)
   const backSeats = BACK_SEATS[vehicleType]
   const canFit = (ride) => filledSeats + ride.seats <= capacity && womenSeats + (ride.women_seats || 0) <= backSeats
+  const myPos = queueStatus.find((q) => q.trip_id === activeTrip?.id)?.queue_pos ?? 1
+  const aheadCanFit = (ride) => queueStatus.some((q) =>
+    q.queue_pos < myPos &&
+    Number(q.filled_seats) + ride.seats <= CAPACITY[q.vehicle_type] &&
+    Number(q.women_seats) + (ride.women_seats || 0) <= BACK_SEATS[q.vehicle_type])
+  const visibleWaiting = waitingPassengers.filter((r) => !aheadCanFit(r))
 
   const handleAcceptPassenger = async (ride) => {
     if (filledSeats + ride.seats > capacity) { setError('Not enough seats left for this passenger.'); return }
@@ -456,7 +474,7 @@ export default function DriverPage() {
             {t('goOffline')}
           </button>
 
-          {isActiveDriver ? (
+          {activeTrip ? (
             <>
               {tripPassengers.length > 0 && (
                 <>
@@ -469,9 +487,10 @@ export default function DriverPage() {
                 </>
               )}
 
+              <p style={{ margin: '0 0 6px', fontSize: 13, color: '#555' }}>{t('queuePosition')}: #{queuePosition}</p>
               <h3 style={{ marginBottom: 6 }}>{t('waitingPassengersOnRoute')}</h3>
-              {waitingPassengers.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>{t('noWaitingPassengers')}</p>}
-              {waitingPassengers.map((r) => (
+              {visibleWaiting.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>{t('noWaitingPassengers')}</p>}
+              {visibleWaiting.map((r) => (
                 <div key={r.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6 }}>
                   <p style={{ margin: 0, fontSize: 13 }}>{t('boardsAt')}: <b>{r.pickup}</b> · {t('getsOffAt')}: <b>{r.destination}</b></p>
                   <p style={{ margin: '2px 0 8px', fontSize: 13 }}>{r.seats} {t('seats')}{r.women_seats > 0 ? ` (${r.women_seats} ${t('womenShort')})` : ''} · ৳{r.fare}</p>
