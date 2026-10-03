@@ -171,7 +171,9 @@ export default function DriverPage() {
     setNegotiatingRide(negotiating || null)
 
     const { data: open } = await supabase.from('rides').select('*')
-      .eq('status', 'searching').eq('ride_type', 'reserve').order('created_at', { ascending: true })
+      .eq('status', 'searching').eq('ride_type', 'reserve')
+      .or(`pickup_time.is.null,pickup_time.gt.${new Date(Date.now() - 30 * 60 * 1000).toISOString()}`)
+      .order('created_at', { ascending: true })
     setReserveRequests(open || [])
   }
 
@@ -603,6 +605,7 @@ export default function DriverPage() {
               <p><b>{t('from')}:</b> {r.pickup}</p>
               <p><b>{t('to')}:</b> {r.destination}</p>
               <p><b>{r.seats}</b> {t('seats')}</p>
+              <p><b>{t('pickupAt')}:</b> {r.pickup_time ? new Date(r.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('pickupNow')}</p>
               <input type="number" placeholder={t('yourFareQuote')} value={quoteInputs[r.id] || ''}
                 onChange={(e) => setQuoteInputs((prev) => ({ ...prev, [r.id]: e.target.value }))}
                 style={{ width: '100%', padding: 8, marginBottom: 8 }} />

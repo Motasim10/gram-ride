@@ -103,6 +103,7 @@ export default function AdminRidesPage() {
               <p style={{ margin: '2px 0', fontSize: 13 }}>
                 {r.ride_type === 'reserve' ? 'Reserve' : 'Shared'} · {r.vehicle_type === 'auto' ? 'Auto' : 'CNG'} · Seats: {r.seats}
                 {r.fare ? ` · ৳${r.fare}` : ''}
+                {r.pickup_time ? ` · Pickup ${new Date(r.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
               </p>
             </div>
             <span style={{ alignSelf: 'center', fontWeight: 'bold', color: STATUS_COLORS[r.status] || '#333' }}>

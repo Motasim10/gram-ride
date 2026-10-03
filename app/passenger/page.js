@@ -34,6 +34,8 @@ export default function PassengerPage() {
   const [routeId, setRouteId] = useState('')
   const [pickupStopId, setPickupStopId] = useState('')
   const [dropStopId, setDropStopId] = useState('')
+  const [pickupMode, setPickupMode] = useState('now')
+  const [pickupTimeInput, setPickupTimeInput] = useState('')
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
@@ -169,6 +171,16 @@ export default function PassengerPage() {
     e.preventDefault()
     if (isFlagged) { setError('Your account has been flagged and cannot request rides right now. Contact support.'); return }
     if (rideType === 'shared' && (!fixedFare || !pickupStop || !dropStop)) { setError(t('routeNotAvailable')); return }
+
+    let pickupTimeIso = null
+    if (rideType === 'reserve' && pickupMode === 'later') {
+      const [hh, mm] = (pickupTimeInput || '').split(':').map(Number)
+      const when = new Date()
+      when.setHours(hh, mm, 0, 0)
+      if (!pickupTimeInput || Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) { setError(t('pickupTimeInvalid')); return }
+      pickupTimeIso = when.toISOString()
+    }
+
     setError('')
     setSosSent(false)
     setShowSosConfirm(false)
@@ -190,6 +202,7 @@ export default function PassengerPage() {
               passenger_id: userId, pickup, destination, seats: Number(seats),
               ride_type: rideType, vehicle_type: vehicleType, status: 'searching',
               fare: null,
+              pickup_time: pickupTimeIso,
             }
       )
       .select().single()
@@ -393,6 +406,9 @@ export default function PassengerPage() {
         <p><b>{t('to')}:</b> {activeRide.destination}</p>
         <p><b>{t('type')}:</b> {typeLabel(activeRide.ride_type)}</p>
         <p><b>{t('vehicle')}:</b> {vehicleLabel(activeRide.vehicle_type)}</p>
+        {activeRide.pickup_time && (
+          <p><b>{t('pickupAt')}:</b> {new Date(activeRide.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+        )}
         <p><b>{activeRide.ride_type === 'reserve' ? t('peopleTraveling') : t('seats')}:</b> {activeRide.seats}</p>
         <p><b>{t('status')}:</b> {t(activeRide.status)}</p>
 
@@ -503,6 +519,19 @@ export default function PassengerPage() {
           <button type="button" onClick={() => handleSelectVehicle('auto')}
             style={{ padding: 8, fontWeight: vehicleType === 'auto' ? 'bold' : 'normal' }}>{t('auto2')}</button>
         </div>
+        {rideType === 'reserve' && (
+          <div style={{ marginBottom: 12 }}>
+            <label>{t('pickupTimeLabel')}</label><br/>
+            <button type="button" onClick={() => setPickupMode('now')}
+              style={{ padding: 8, marginRight: 8, fontWeight: pickupMode === 'now' ? 'bold' : 'normal' }}>{t('pickupNow')}</button>
+            <button type="button" onClick={() => setPickupMode('later')}
+              style={{ padding: 8, fontWeight: pickupMode === 'later' ? 'bold' : 'normal' }}>{t('pickupLater')}</button>
+            {pickupMode === 'later' && (
+              <input type="time" value={pickupTimeInput} onChange={(e) => setPickupTimeInput(e.target.value)} required
+                style={{ width: '100%', padding: 8, marginTop: 8 }} />
+            )}
+          </div>
+        )}
         {rideType === 'shared' ? (
           <>
             <div style={{ marginBottom: 12 }}>
