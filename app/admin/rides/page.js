@@ -59,7 +59,9 @@ export default function AdminRidesPage() {
 
   const forceCancel = async (ride) => {
     if (!window.confirm(`Force-cancel this ride (${ride.pickup} → ${ride.destination})?`)) return
-    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', ride.id).select()
+    const { data, error } = await supabase.from('rides').update({ status: 'cancelled' }).eq('id', ride.id).select()
+    if (error) { alert('Cancel failed: ' + error.message) }
+    else if (!data || data.length === 0) { alert('Cancel did not go through: 0 rows were updated.') }
     await loadRides()
   }
 
