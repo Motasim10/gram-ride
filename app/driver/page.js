@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n'
 import NotificationBell from '@/lib/NotificationBell'
 
 const CAPACITY = { cng: 5, auto: 2 }
+const BACK_SEATS = { cng: 3, auto: 2 }
 
 export default function DriverPage() {
   const [userId, setUserId] = useState(null)
@@ -352,9 +353,13 @@ export default function DriverPage() {
   }
 
   const filledSeats = tripPassengers.reduce((sum, r) => sum + r.seats, 0)
+  const womenSeats = tripPassengers.reduce((sum, r) => sum + (r.women_seats || 0), 0)
+  const backSeats = BACK_SEATS[vehicleType]
+  const canFit = (ride) => filledSeats + ride.seats <= capacity && womenSeats + (ride.women_seats || 0) <= backSeats
 
   const handleAcceptPassenger = async (ride) => {
     if (filledSeats + ride.seats > capacity) { setError('Not enough seats left for this passenger.'); return }
+    if (womenSeats + (ride.women_seats || 0) > backSeats) { setError(t('notEnoughBackSeats')); return }
     setLoading(true); setError('')
     const { data, error: updateError } = await supabase.from('rides')
       .update({ driver_id: userId, status: 'accepted', trip_id: activeTrip.id })
@@ -444,6 +449,7 @@ export default function DriverPage() {
           </p>
           <p style={{ margin: '4px 0 12px', fontSize: 13, color: '#555' }}>
             {vehicleLabel(activeTrip.vehicle_type)} · {filledSeats}/{capacity} {t('seatsFilled')}
+            {activeTrip.vehicle_type === 'cng' && ` · ${t('womenAboard')}: ${womenSeats}/${backSeats}`}
           </p>
 
           <button onClick={handleGoOffline} disabled={loading} style={{ padding: 8, width: '100%', marginBottom: 12, background: 'none', border: '1px solid #c00', color: '#c00' }}>
@@ -457,7 +463,7 @@ export default function DriverPage() {
                   <h3 style={{ marginBottom: 6 }}>{t('passengersOnBoard')} ({filledSeats}/{capacity})</h3>
                   {tripPassengers.map((p) => (
                     <div key={p.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6, fontSize: 13 }}>
-                      {t('boardsAt')}: {p.pickup} · {t('getsOffAt')}: {p.destination} · {p.seats} {t('seats')} · ৳{p.fare}
+                      {t('boardsAt')}: {p.pickup} · {t('getsOffAt')}: {p.destination} · {p.seats} {t('seats')}{p.women_seats > 0 ? ` (${p.women_seats} ${t('womenShort')})` : ''} · ৳{p.fare}
                     </div>
                   ))}
                 </>
@@ -468,8 +474,8 @@ export default function DriverPage() {
               {waitingPassengers.map((r) => (
                 <div key={r.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6 }}>
                   <p style={{ margin: 0, fontSize: 13 }}>{t('boardsAt')}: <b>{r.pickup}</b> · {t('getsOffAt')}: <b>{r.destination}</b></p>
-                  <p style={{ margin: '2px 0 8px', fontSize: 13 }}>{r.seats} {t('seats')} · ৳{r.fare}</p>
-                  <button onClick={() => handleAcceptPassenger(r)} disabled={loading || filledSeats + r.seats > capacity}
+                  <p style={{ margin: '2px 0 8px', fontSize: 13 }}>{r.seats} {t('seats')}{r.women_seats > 0 ? ` (${r.women_seats} ${t('womenShort')})` : ''} · ৳{r.fare}</p>
+                  <button onClick={() => handleAcceptPassenger(r)} disabled={loading || !canFit(r)}
                     style={{ padding: 8, width: '100%' }}>
                     {t('accept')}
                   </button>

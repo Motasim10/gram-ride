@@ -36,6 +36,7 @@ export default function PassengerPage() {
   const [dropStopId, setDropStopId] = useState('')
   const [pickupMode, setPickupMode] = useState('now')
   const [pickupTimeInput, setPickupTimeInput] = useState('')
+  const [womenCount, setWomenCount] = useState(0)
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
@@ -139,6 +140,7 @@ export default function PassengerPage() {
           setPickup('')
           setDestination('')
           setSeats(1)
+          setWomenCount(0)
           setRouteId('')
           setPickupStopId('')
           setDropStopId('')
@@ -149,6 +151,7 @@ export default function PassengerPage() {
           setPickup('')
           setDestination('')
           setSeats(1)
+          setWomenCount(0)
           setRouteId('')
           setPickupStopId('')
           setDropStopId('')
@@ -181,6 +184,9 @@ export default function PassengerPage() {
       pickupTimeIso = when.toISOString()
     }
 
+    const womenSeats = rideType === 'shared' ? Number(womenCount) || 0 : 0
+    if (rideType === 'shared' && (womenSeats < 0 || womenSeats > Number(seats) || womenSeats > (vehicleType === 'cng' ? 3 : 2))) { setError(t('womenCountInvalid')); return }
+
     setError('')
     setSosSent(false)
     setShowSosConfirm(false)
@@ -197,6 +203,7 @@ export default function PassengerPage() {
               fare: fixedFare,
               route_id: Number(routeId),
               pickup_pos: pickupStop.position, drop_pos: dropStop.position,
+              women_seats: womenSeats,
             }
           : {
               passenger_id: userId, pickup, destination, seats: Number(seats),
@@ -575,6 +582,15 @@ export default function PassengerPage() {
             style={{ width: '100%', padding: 8 }} />
           <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{t('maxFor')} {capacity} {vehicleLabel(vehicleType)}</p>
         </div>
+        {rideType === 'shared' && (
+          <div style={{ marginBottom: 12 }}>
+            <label>{t('womenCountLabel')}</label><br/>
+            <input type="number" min="0" max={Math.min(Number(seats) || 1, vehicleType === 'cng' ? 3 : 2)} value={womenCount}
+              onChange={(e) => setWomenCount(Math.max(0, Number(e.target.value)))}
+              style={{ width: '100%', padding: 8 }} />
+            <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{t('womenCountHint')}</p>
+          </div>
+        )}
         {rideType === 'shared' && pickupStopId && dropStopId && (
           fixedFare ? (
             <p style={{ fontSize: 14, fontWeight: 'bold', color: '#0066cc', marginBottom: 12 }}>{t('fare')}: ৳{fixedFare} ({t('cannotNegotiate')})</p>
