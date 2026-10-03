@@ -225,11 +225,11 @@ export default function PassengerPage() {
   const handleCancelRide = async () => {
     setLoading(true); setError('')
     const previousDriverId = activeRide.driver_id
+    if (previousDriverId) await notify(previousDriverId, 'cancelled', {})
     await supabase.from('bids').delete().eq('ride_id', activeRide.id)
     setBids([])
     const { error: updateError } = await supabase.from('rides')
       .update({ status: 'searching', driver_id: null }).eq('id', activeRide.id).eq('passenger_id', userId)
-    if (!updateError && previousDriverId) await notify(previousDriverId, 'cancelled', {})
     if (updateError) setError(updateError.message)
     setLoading(false)
   }

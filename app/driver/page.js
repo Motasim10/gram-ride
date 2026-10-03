@@ -335,10 +335,12 @@ export default function DriverPage() {
 
   const handleGoOffline = async () => {
     setLoading(true)
-    const { data: released } = await supabase.from('rides')
+    const { data: toRelease } = await supabase.from('rides').select('id, passenger_id')
+      .eq('trip_id', activeTrip.id).eq('status', 'accepted')
+    for (const r of toRelease || []) await notify(r.passenger_id, 'tripCancelledByDriver', {})
+    await supabase.from('rides')
       .update({ status: 'searching', driver_id: null, trip_id: null })
-      .eq('trip_id', activeTrip.id).eq('status', 'accepted').select()
-    for (const r of released || []) await notify(r.passenger_id, 'tripCancelledByDriver', {})
+      .eq('trip_id', activeTrip.id).eq('status', 'accepted')
     await supabase.from('trips').update({ status: 'cancelled' }).eq('id', activeTrip.id).select()
     setActiveTrip(null)
     setTripPassengers([])
