@@ -39,6 +39,7 @@ export default function DriverPage() {
   const tripChannelRef = useRef(null)
   const queueChannelRef = useRef(null)
   const isActiveDriverRef = useRef(false)
+  const activeRouteIdRef = useRef(null)
   const [routeTrips, setRouteTrips] = useState([])
   const myTripChannelRef = useRef(null)
 
@@ -124,6 +125,7 @@ export default function DriverPage() {
   const queuePosition = queueIndex + 1
 
   useEffect(() => { isActiveDriverRef.current = isActiveDriver }, [isActiveDriver])
+  useEffect(() => { activeRouteIdRef.current = activeTrip ? Number(activeTrip.route_id) : null }, [activeTrip?.route_id])
 
   useEffect(() => {
     if (queueChannelRef.current) { supabase.removeChannel(queueChannelRef.current); queueChannelRef.current = null }
@@ -204,7 +206,7 @@ export default function DriverPage() {
         if (row.status !== 'searching') return
         if (row.ride_type === 'reserve') {
           setReserveRequests((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
-        } else if (isActiveDriverRef.current) {
+        } else if (isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current) {
           setWaitingPassengers((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
         }
       })
@@ -213,6 +215,12 @@ export default function DriverPage() {
         if (row.status !== 'searching') {
           setReserveRequests((prev) => prev.filter((r) => r.id !== row.id))
           setWaitingPassengers((prev) => prev.filter((r) => r.id !== row.id))
+        }
+        if (row.status === 'searching' && row.ride_type === 'reserve') {
+          setReserveRequests((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
+        }
+        if (row.status === 'searching' && row.ride_type === 'shared' && isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current) {
+          setWaitingPassengers((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
         }
         if (row.status === 'cancelled') {
           setTripPassengers((prev) => prev.filter((r) => r.id !== row.id))
