@@ -13,6 +13,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [editing, setEditing] = useState(false)
   const router = useRouter()
   const { t } = useLanguage()
 
@@ -35,7 +36,13 @@ export default function ProfilePage() {
     setProfile((prev) => ({ ...prev, area }))
     setSaved(true)
     setSaving(false)
+    setEditing(false)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleCancelEdit = () => {
+    setArea(profile?.area || '')
+    setEditing(false)
   }
 
   const handleSwitchRole = async () => {
@@ -65,7 +72,19 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <SectionCard className="mb-4 space-y-4">
+      <SectionCard className="relative mb-4 space-y-4">
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            aria-label={t('areaLabel')}
+            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-mint text-emerald active:bg-emerald active:text-white"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
+            </svg>
+          </button>
+        )}
         <div>
           <p className="text-[13px] font-semibold text-charcoal/60">{t('phone')}</p>
           <p className="font-num text-[17px] font-bold text-charcoal">{profile.phone}</p>
@@ -74,17 +93,29 @@ export default function ProfilePage() {
           <p className="text-[13px] font-semibold text-charcoal/60">{t('currentRole')}</p>
           <p className="font-bold text-charcoal">{t(profile.role)}</p>
         </div>
-        <label className="block">
-          <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('areaLabel')}</span>
-          <input
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            className="tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none"
-          />
-        </label>
-        <PrimaryButton onClick={handleSaveArea} disabled={saving}>
-          {saved ? `✓ ${t('changesSaved')}` : t('saveChanges')}
-        </PrimaryButton>
+        {editing ? (
+          <>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('areaLabel')}</span>
+              <input
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                autoFocus
+                className="tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <PrimaryButton tone="outline" onClick={handleCancelEdit} disabled={saving}>{t('cancel')}</PrimaryButton>
+              <PrimaryButton onClick={handleSaveArea} disabled={saving}>{t('saveChanges')}</PrimaryButton>
+            </div>
+          </>
+        ) : (
+          <div>
+            <p className="text-[13px] font-semibold text-charcoal/60">{t('areaLabel')}</p>
+            <p className="font-bold text-charcoal">{profile.area || '—'}</p>
+            {saved && <p className="mt-1 text-[13px] font-semibold text-emerald">✓ {t('changesSaved')}</p>}
+          </div>
+        )}
       </SectionCard>
 
       <div className="space-y-3">
