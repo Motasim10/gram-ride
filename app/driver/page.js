@@ -5,10 +5,74 @@ import { useRouter } from 'next/navigation'
 import { notify } from '@/lib/notify'
 import { useLanguage } from '@/lib/i18n'
 import NotificationBell from '@/lib/NotificationBell'
+import Screen from '@/components/ui/Screen'
+import PrimaryButton from '@/components/ui/PrimaryButton'
+import SectionCard from '@/components/ui/SectionCard'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
 const notExpired = (r) => !r.expires_at || new Date(r.expires_at).getTime() > Date.now()
+
+const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none disabled:opacity-50'
+const inputClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
+const dangerButtonClass = 'tap-target w-full rounded-2xl border-2 border-danger bg-white text-[15px] font-bold text-danger active:bg-danger/10 disabled:opacity-40'
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Chip({ children, tone = 'plain' }) {
+  const tones = {
+    plain: 'bg-offwhite text-charcoal/70 border-line-soft',
+    green: 'bg-mint text-emerald border-emerald/40',
+    amber: 'bg-amber/15 text-amber-dark border-amber/50',
+  }
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-bold ${tones[tone]}`}>{children}</span>
+  )
+}
+
+function Gauge({ label, value, max }) {
+  const pct = Math.min(100, Math.round((value / max) * 100))
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-[12.5px] font-semibold text-charcoal/60">
+        <span>{label}</span>
+        <span className="font-num font-bold text-charcoal">{value}/{max}</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-line-soft">
+        <div className={`h-full rounded-full ${pct >= 100 ? 'bg-amber' : 'bg-emerald'}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function StopPair({ fromLabel, from, toLabel, to }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center pt-1.5">
+        <span className="h-3 w-3 rounded-full bg-emerald" />
+        <span className="my-1 w-px flex-1 bg-line" />
+        <span className="h-3 w-3 rounded-full bg-amber" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div>
+          <p className="text-[12px] text-charcoal/50">{fromLabel}</p>
+          <p className="font-bold text-charcoal">{from}</p>
+        </div>
+        <div>
+          <p className="text-[12px] text-charcoal/50">{toLabel}</p>
+          <p className="font-bold text-charcoal">{to}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function DriverPage() {
   const [userId, setUserId] = useState(null)
@@ -428,194 +492,240 @@ export default function DriverPage() {
   const typeLabel = (rt) => (rt === 'reserve' ? t('reserve') : t('shared'))
   const vehicleLabel = (v) => (v === 'auto' ? t('auto2') : t('cng5'))
 
-  if (loading && !activeTrip && !negotiatingRide) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (loading && !activeTrip && !negotiatingRide) {
+    return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
+  }
+
+  const routeName = (id) => routes.find((r) => r.id === id)?.name
+  const timeLabel = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div style={{ maxWidth: 420, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
+    <Screen>
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="text-[22px] font-bold text-charcoal">{t('rideRequestsTitle')}</h1>
+        <NotificationBell />
+      </div>
+
       {isFlagged && (
-        <div style={{ background: '#fff5f5', border: '1px solid #f5c6c6', borderRadius: 8, padding: 12, marginBottom: 16 }}>
-          <p style={{ margin: 0, color: '#c00', fontWeight: 'bold' }}>⚠️ Account Flagged</p>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#c00' }}>
+        <div className="mb-4 rounded-2xl border-2 border-danger/40 bg-danger/5 p-4">
+          <p className="font-bold text-danger">⚠️ Account Flagged</p>
+          <p className="mt-1 text-[13px] text-danger">
             Your account has been flagged by an admin and cannot accept new rides right now. Please contact support.
           </p>
         </div>
       )}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="mb-4 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
 
       {/* ---------- Shared route / trip section ---------- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <h1>{t('rideRequestsTitle')}</h1>
-        <NotificationBell />
-      </div>
-
       {!activeTrip && (
-        <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 20 }}>
-          <div style={{ marginBottom: 10 }}>
-            <label>{t('routeLabel')}</label><br/>
-            <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} style={{ width: '100%', padding: 8 }}>
+        <SectionCard className="mb-4 space-y-4">
+          <Field label={t('routeLabel')}>
+            <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} className={selectClass}>
               <option value="">{routes.length === 0 ? t('noRoutesYet') : t('selectPlaceholder')}</option>
               {routes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
+          </Field>
+          <div>
+            <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('vehicle')}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[['cng', '🚕', t('cng5')], ['auto', '🛺', t('auto2')]].map(([v, icon, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVehicleType(v)}
+                  className={`tap-target flex flex-col items-center gap-1 rounded-xl border-2 py-3 text-[13px] font-bold ${vehicleType === v ? 'border-emerald bg-mint text-emerald' : 'border-line bg-white text-charcoal/70'}`}
+                >
+                  <span className="text-2xl">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <label>{t('vehicle')}</label><br/>
-            <button type="button" onClick={() => setVehicleType('cng')} style={{ padding: 8, marginRight: 8, fontWeight: vehicleType === 'cng' ? 'bold' : 'normal' }}>{t('cng5')}</button>
-            <button type="button" onClick={() => setVehicleType('auto')} style={{ padding: 8, fontWeight: vehicleType === 'auto' ? 'bold' : 'normal' }}>{t('auto2')}</button>
-          </div>
-          <button onClick={handleGoOnline} disabled={loading || isFlagged} style={{ padding: 10, width: '100%' }}>{t('goOnline')}</button>
-        </div>
+          <PrimaryButton onClick={handleGoOnline} disabled={loading || isFlagged}>{t('goOnline')}</PrimaryButton>
+        </SectionCard>
       )}
 
       {activeTrip && activeTrip.status === 'open' && (
-        <div style={{ border: '1px solid #0066cc', borderRadius: 8, padding: 12, marginBottom: 20 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>
-            {t('onlineOnRoute')}: {routes.find((r) => r.id === activeTrip.route_id)?.name}
-          </p>
-          <p style={{ margin: '4px 0 12px', fontSize: 13, color: '#555' }}>
-            {vehicleLabel(activeTrip.vehicle_type)} · {filledSeats}/{capacity} {t('seatsFilled')}
-            {activeTrip.vehicle_type === 'cng' && ` · ${t('womenAboard')}: ${womenSeats}/${backSeats}`}
-          </p>
-
-          <button onClick={handleGoOffline} disabled={loading} style={{ padding: 8, width: '100%', marginBottom: 12, background: 'none', border: '1px solid #c00', color: '#c00' }}>
-            {t('goOffline')}
-          </button>
-
-          {activeTrip ? (
-            <>
-              {tripPassengers.length > 0 && (
-                <>
-                  <h3 style={{ marginBottom: 6 }}>{t('passengersOnBoard')} ({filledSeats}/{capacity})</h3>
-                  {tripPassengers.map((p) => (
-                    <div key={p.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6, fontSize: 13 }}>
-                      {t('boardsAt')}: {p.pickup} · {t('getsOffAt')}: {p.destination} · {p.seats} {t('seats')}{p.women_seats > 0 ? ` (${p.women_seats} ${t('womenShort')})` : ''} · ৳{p.fare}
-                    </div>
-                  ))}
-                </>
-              )}
-
-              <p style={{ margin: '0 0 6px', fontSize: 13, color: '#555' }}>{t('queuePosition')}: #{queuePosition}</p>
-              <h3 style={{ marginBottom: 6 }}>{t('waitingPassengersOnRoute')}</h3>
-              {visibleWaiting.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>{t('noWaitingPassengers')}</p>}
-              {visibleWaiting.map((r) => (
-                <div key={r.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6 }}>
-                  <p style={{ margin: 0, fontSize: 13 }}>{t('boardsAt')}: <b>{r.pickup}</b> · {t('getsOffAt')}: <b>{r.destination}</b></p>
-                  <p style={{ margin: '2px 0 8px', fontSize: 13 }}>{r.seats} {t('seats')}{r.women_seats > 0 ? ` (${r.women_seats} ${t('womenShort')})` : ''} · ৳{r.fare}</p>
-                  <button onClick={() => handleAcceptPassenger(r)} disabled={loading || !canFit(r)}
-                    style={{ padding: 8, width: '100%' }}>
-                    {t('accept')}
-                  </button>
-                </div>
-              ))}
-
-              {tripPassengers.length > 0 && (
-                <button onClick={handleStartTrip} disabled={loading} style={{ padding: 10, width: '100%', marginTop: 12 }}>
-                  {t('startTrip')}
-                </button>
-              )}
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <p style={{ margin: 0, fontWeight: 'bold', fontSize: 18 }}>🚦 {t('inQueue')}</p>
-              <p style={{ margin: '6px 0', fontSize: 14 }}>{t('queuePosition')}: #{queuePosition}</p>
-              <p style={{ margin: 0, fontSize: 13, color: '#888' }}>{t('waitingForTurn')}</p>
+        <div className="mb-4 space-y-4">
+          <SectionCard className="border-emerald">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald" />
+                <p className="font-bold text-charcoal">{t('onlineOnRoute')}</p>
+              </div>
+              <Chip tone="green">{t('queuePosition')}: #{queuePosition}</Chip>
             </div>
+            <p className="mt-1 text-[16px] font-bold text-emerald">{routeName(activeTrip.route_id)}</p>
+            <p className="text-[13px] text-charcoal/60">{vehicleLabel(activeTrip.vehicle_type)}</p>
+            <div className="mt-4 space-y-3">
+              <Gauge label={t('seatsFilled')} value={filledSeats} max={capacity} />
+              {activeTrip.vehicle_type === 'cng' && <Gauge label={t('womenAboard')} value={womenSeats} max={backSeats} />}
+            </div>
+            <button onClick={handleGoOffline} disabled={loading} className={`${dangerButtonClass} mt-4`}>
+              {t('goOffline')}
+            </button>
+          </SectionCard>
+
+          {tripPassengers.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[15px] font-bold text-charcoal">{t('passengersOnBoard')} ({filledSeats}/{capacity})</h3>
+              <div className="space-y-2">
+                {tripPassengers.map((p) => (
+                  <div key={p.id} className="rounded-xl border-2 border-line-soft bg-white p-3">
+                    <StopPair fromLabel={t('boardsAt')} from={p.pickup} toLabel={t('getsOffAt')} to={p.destination} />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Chip>{p.seats} {t('seats')}</Chip>
+                      {p.women_seats > 0 && <Chip tone="amber">{p.women_seats} {t('womenShort')}</Chip>}
+                      <Chip tone="green">৳{p.fare}</Chip>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h3 className="mb-2 text-[15px] font-bold text-charcoal">{t('waitingPassengersOnRoute')}</h3>
+            {visibleWaiting.length === 0 && (
+              <p className="rounded-xl border-2 border-line-soft bg-white px-3 py-4 text-center text-[14px] text-charcoal/50">
+                {t('noWaitingPassengers')}
+              </p>
+            )}
+            <div className="space-y-3">
+              {visibleWaiting.map((r) => (
+                <SectionCard key={r.id} className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <StopPair fromLabel={t('boardsAt')} from={r.pickup} toLabel={t('getsOffAt')} to={r.destination} />
+                    </div>
+                    <p className="font-num text-[24px] font-extrabold text-emerald">৳{r.fare}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip>{r.seats} {t('seats')}</Chip>
+                    {r.women_seats > 0 && <Chip tone="amber">{r.women_seats} {t('womenShort')}</Chip>}
+                  </div>
+                  {!canFit(r) && <p className="text-[13px] font-semibold text-danger">{t('noRoomForThis')}</p>}
+                  <PrimaryButton onClick={() => handleAcceptPassenger(r)} disabled={loading || !canFit(r)}>
+                    {t('accept')}
+                  </PrimaryButton>
+                </SectionCard>
+              ))}
+            </div>
+          </div>
+
+          {tripPassengers.length > 0 && (
+            <PrimaryButton onClick={handleStartTrip} disabled={loading}>{t('startTrip')}</PrimaryButton>
           )}
         </div>
       )}
 
       {activeTrip && activeTrip.status === 'in_progress' && (
-        <div style={{ border: '1px solid #2e7d32', borderRadius: 8, padding: 12, marginBottom: 20 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{t('tripInProgress')}</p>
-          <p style={{ margin: '4px 0 12px', fontSize: 13, color: '#555' }}>
-            {routes.find((r) => r.id === activeTrip.route_id)?.name} · {tripPassengers.length} {t('passengersOnBoard')}
-          </p>
+        <div className="mb-4 space-y-4">
+          <SectionCard className="border-emerald">
+            <p className="font-bold text-emerald">{t('tripInProgress')}</p>
+            <p className="mt-1 text-[14px] text-charcoal/70">
+              {routeName(activeTrip.route_id)} · {tripPassengers.length} {t('passengersOnBoard')}
+            </p>
+          </SectionCard>
 
           {tripPassengers.map((p) => (
-            <div key={p.id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8, marginBottom: 6 }}>
-              <p style={{ margin: 0, fontSize: 13 }}>{t('boardsAt')}: <b>{p.pickup}</b> → {t('getsOffAt')}: <b>{p.destination}</b></p>
-              <p style={{ margin: '2px 0 8px', fontSize: 13, fontWeight: 'bold' }}>৳{p.fare}</p>
+            <SectionCard key={p.id} className="space-y-3">
+              <StopPair fromLabel={t('boardsAt')} from={p.pickup} toLabel={t('getsOffAt')} to={p.destination} />
+              <p className="font-num text-[24px] font-extrabold text-emerald">৳{p.fare}</p>
               {confirmingRideId === p.id ? (
-                <>
-                  <p style={{ fontSize: 13 }}>{t('confirmCashFrom')} ৳{p.fare}?</p>
-                  <button onClick={() => handleConfirmCash(p)} disabled={loading} style={{ padding: 8, width: '100%', marginBottom: 6 }}>
+                <div className="space-y-2">
+                  <p className="text-[14px] font-semibold text-charcoal">{t('confirmCashFrom')} ৳{p.fare}?</p>
+                  <PrimaryButton onClick={() => handleConfirmCash(p)} disabled={loading}>
                     {t('yesReceived')}{p.fare}
-                  </button>
-                  <button onClick={() => setConfirmingRideId(null)} disabled={loading} style={{ padding: 8, width: '100%' }}>
+                  </PrimaryButton>
+                  <PrimaryButton tone="outline" onClick={() => setConfirmingRideId(null)} disabled={loading}>
                     {t('noGoBack')}
-                  </button>
-                </>
+                  </PrimaryButton>
+                </div>
               ) : (
-                <button onClick={() => setConfirmingRideId(p.id)} style={{ padding: 8, width: '100%' }}>
-                  {t('confirmCashFrom')}
-                </button>
+                <PrimaryButton tone="amber" onClick={() => setConfirmingRideId(p.id)}>{t('confirmCashFrom')}</PrimaryButton>
               )}
-            </div>
+            </SectionCard>
           ))}
 
-          {tripPassengers.length === 0 ? (
-            <p style={{ color: 'green', fontSize: 13 }}>{t('allPassengersSettled')}</p>
-          ) : null}
+          {tripPassengers.length === 0 && (
+            <p className="rounded-xl border-2 border-emerald/40 bg-mint px-4 py-3 font-semibold text-emerald-dark">
+              {t('allPassengersSettled')}
+            </p>
+          )}
 
-          <button onClick={handleFinishTrip} disabled={loading || tripPassengers.length > 0} style={{ padding: 10, width: '100%', marginTop: 12 }}>
+          <PrimaryButton onClick={handleFinishTrip} disabled={loading || tripPassengers.length > 0}>
             {t('finishTrip')}
-          </button>
+          </PrimaryButton>
         </div>
       )}
 
-      {/* ---------- Reserve section (unchanged) ---------- */}
-            {activeReserveRide && (
-        <div style={{ border: '1px solid #2e7d32', borderRadius: 8, padding: 12, marginBottom: 20 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{t('yourActiveRide')}</p>
-          <p style={{ margin: '4px 0' }}><b>{t('from')}:</b> {activeReserveRide.pickup}</p>
-          <p style={{ margin: '4px 0' }}><b>{t('to')}:</b> {activeReserveRide.destination}</p>
-          <p style={{ margin: '4px 0' }}><b>{t('fare')}:</b> ৳{activeReserveRide.fare}</p>
+      {/* ---------- Reserve section ---------- */}
+      {activeReserveRide && (
+        <SectionCard className="mb-4 space-y-3 border-emerald">
+          <p className="font-bold text-emerald">{t('yourActiveRide')}</p>
+          <StopPair fromLabel={t('from')} from={activeReserveRide.pickup} toLabel={t('to')} to={activeReserveRide.destination} />
+          <p className="text-[14px] text-charcoal/60">
+            {t('fare')}: <span className="font-num text-[22px] font-extrabold text-emerald">৳{activeReserveRide.fare}</span>
+          </p>
 
           {!confirmingReserveComplete ? (
-            <button onClick={() => setConfirmingReserveComplete(true)} style={{ padding: 10, width: '100%', marginTop: 8 }}>
-              {t('completeTrip')}
-            </button>
+            <PrimaryButton onClick={() => setConfirmingReserveComplete(true)}>{t('completeTrip')}</PrimaryButton>
           ) : (
-            <div style={{ marginTop: 8 }}>
-              <p style={{ fontSize: 13 }}>{t('didYouReceive')}{activeReserveRide.fare} {t('inCash')}</p>
-              <button onClick={handleCompleteReserve} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 6 }}>
+            <div className="space-y-2">
+              <p className="text-[14px] font-semibold text-charcoal">{t('didYouReceive')}{activeReserveRide.fare} {t('inCash')}</p>
+              <PrimaryButton onClick={handleCompleteReserve} disabled={loading}>
                 {t('yesReceived')}{activeReserveRide.fare}
-              </button>
-              <button onClick={() => setConfirmingReserveComplete(false)} disabled={loading} style={{ padding: 8, width: '100%' }}>
+              </PrimaryButton>
+              <PrimaryButton tone="outline" onClick={() => setConfirmingReserveComplete(false)} disabled={loading}>
                 {t('noGoBack')}
-              </button>
+              </PrimaryButton>
             </div>
           )}
-        </div>
+        </SectionCard>
       )}
 
-      <h2>{t('reserveRequestsTitle')}</h2>
+      <h2 className="mb-3 mt-6 text-[18px] font-bold text-charcoal">{t('reserveRequestsTitle')}</h2>
 
       {negotiatingRide ? (
-        <div>
-          <p><b>{t('from')}:</b> {negotiatingRide.pickup}</p>
-          <p><b>{t('to')}:</b> {negotiatingRide.destination}</p>
-          <p><b>{negotiatingRide.seats}</b> {t('seats')}</p>
+        <SectionCard className="space-y-3">
+          <StopPair fromLabel={t('from')} from={negotiatingRide.pickup} toLabel={t('to')} to={negotiatingRide.destination} />
+          <div className="flex flex-wrap gap-2">
+            <Chip>{negotiatingRide.seats} {t('seats')}</Chip>
+            {negotiatingRide.pickup_time && <Chip tone="amber">{t('pickupAt')}: {timeLabel(negotiatingRide.pickup_time)}</Chip>}
+          </div>
 
           {bids.length === 1 && (
             <>
-              <p><b>{t('youQuoted')}:</b> ৳{latestBid.amount}</p>
-              <p style={{ color: '#888' }}>{t('waitingForPassengerResponse')}</p>
+              <div>
+                <p className="text-[13px] font-semibold text-charcoal/60">{t('youQuoted')}</p>
+                <p className="font-num text-[32px] font-extrabold text-charcoal">৳{latestBid.amount}</p>
+              </div>
+              <p className="text-[14px] text-charcoal/60">{t('waitingForPassengerResponse')}</p>
             </>
           )}
 
           {bids.length === 2 && (
             <>
-              <p><b>{t('passengerCountered')}:</b> ৳{latestBid.amount}</p>
-              <button onClick={handleAcceptCounter} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
+              <div>
+                <p className="text-[13px] font-semibold text-charcoal/60">{t('passengerCountered')}</p>
+                <p className="font-num text-[32px] font-extrabold text-emerald">৳{latestBid.amount}</p>
+              </div>
+              <PrimaryButton onClick={handleAcceptCounter} disabled={loading}>
                 {t('accept')} ৳{latestBid.amount}
-              </button>
-              <input type="number" placeholder={t('yourFinalOffer')} value={finalOfferAmount}
-                onChange={(e) => setFinalOfferAmount(e.target.value)} style={{ width: '100%', padding: 8, marginBottom: 8 }} />
-              <button onClick={handleSendFinalOffer} disabled={loading} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
+              </PrimaryButton>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder={t('yourFinalOffer')}
+                value={finalOfferAmount}
+                onChange={(e) => setFinalOfferAmount(e.target.value)}
+                className={`${inputClass} font-num`}
+              />
+              <PrimaryButton tone="outline" onClick={handleSendFinalOffer} disabled={loading}>
                 {t('sendFinalOffer')}
-              </button>
-              <button onClick={handleRejectCounter} disabled={loading}
-                style={{ padding: 8, width: '100%', background: 'none', border: 'none', color: '#888', textDecoration: 'underline' }}>
+              </PrimaryButton>
+              <button onClick={handleRejectCounter} disabled={loading} className="w-full py-2 text-[14px] font-semibold text-charcoal/50 underline">
                 {t('notInterestedRelease')}
               </button>
             </>
@@ -623,30 +733,43 @@ export default function DriverPage() {
 
           {bids.length >= 3 && (
             <>
-              <p><b>{t('youSentFinalOffer')}:</b> ৳{latestBid.amount}</p>
-              <p style={{ color: '#888' }}>{t('waitingForPassengerDecision')}</p>
+              <div>
+                <p className="text-[13px] font-semibold text-charcoal/60">{t('youSentFinalOffer')}</p>
+                <p className="font-num text-[32px] font-extrabold text-charcoal">৳{latestBid.amount}</p>
+              </div>
+              <p className="text-[14px] text-charcoal/60">{t('waitingForPassengerDecision')}</p>
             </>
           )}
-        </div>
+        </SectionCard>
       ) : (
         <>
-          {reserveRequests.filter(notExpired).length === 0 && <p>{t('noRequestsWaiting')}</p>}
-          {reserveRequests.filter(notExpired).map((r) => (
-            <div key={r.id} style={{ border: '1px solid #ccc', padding: 12, marginBottom: 12, borderRadius: 8 }}>
-              <p><b>{t('from')}:</b> {r.pickup}</p>
-              <p><b>{t('to')}:</b> {r.destination}</p>
-              <p><b>{r.seats}</b> {t('seats')}</p>
-              <p><b>{t('pickupAt')}:</b> {r.pickup_time ? new Date(r.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('pickupNow')}</p>
-              <input type="number" placeholder={t('yourFareQuote')} value={quoteInputs[r.id] || ''}
-                onChange={(e) => setQuoteInputs((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                style={{ width: '100%', padding: 8, marginBottom: 8 }} />
-              <button onClick={() => handleSendQuote(r)} disabled={loading} style={{ padding: 8, width: '100%' }}>
-                {t('sendQuote')}
-              </button>
-            </div>
-          ))}
+          {reserveRequests.filter(notExpired).length === 0 && (
+            <p className="rounded-xl border-2 border-line-soft bg-white px-3 py-4 text-center text-[14px] text-charcoal/50">
+              {t('noRequestsWaiting')}
+            </p>
+          )}
+          <div className="space-y-3">
+            {reserveRequests.filter(notExpired).map((r) => (
+              <SectionCard key={r.id} className="space-y-3">
+                <StopPair fromLabel={t('from')} from={r.pickup} toLabel={t('to')} to={r.destination} />
+                <div className="flex flex-wrap gap-2">
+                  <Chip>{r.seats} {t('seats')}</Chip>
+                  <Chip tone="amber">{t('pickupAt')}: {r.pickup_time ? timeLabel(r.pickup_time) : t('pickupNow')}</Chip>
+                </div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={t('yourFareQuote')}
+                  value={quoteInputs[r.id] || ''}
+                  onChange={(e) => setQuoteInputs((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                  className={`${inputClass} font-num`}
+                />
+                <PrimaryButton onClick={() => handleSendQuote(r)} disabled={loading}>{t('sendQuote')}</PrimaryButton>
+              </SectionCard>
+            ))}
+          </div>
         </>
       )}
-    </div>
+    </Screen>
   )
 }
