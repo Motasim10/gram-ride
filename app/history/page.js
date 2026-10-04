@@ -3,6 +3,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import SectionCard from '@/components/ui/SectionCard'
+
+const chipClass = 'inline-flex items-center rounded-full border border-line-soft bg-offwhite px-2.5 py-1 text-[12px] font-bold text-charcoal/70'
 
 export default function HistoryPage() {
   const { t } = useLanguage()
@@ -30,29 +34,49 @@ export default function HistoryPage() {
     load()
   }, [])
 
-  const totalFare = trips.reduce((sum, t) => sum + (t.fare || 0), 0)
+  const totalFare = trips.reduce((sum, r) => sum + (r.fare || 0), 0)
 
-    if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (loading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('tripHistoryTitle')}</h1>
-      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <div><b>{t('totalTrips')}</b><br/>{trips.length}</div>
-        <div><b>{t('fare')}</b><br/>৳{totalFare}</div>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('tripHistoryTitle')}</h1>
+
+      <div className="mb-5 grid grid-cols-2 gap-3">
+        <SectionCard>
+          <p className="text-[12.5px] font-semibold text-charcoal/60">{t('totalTrips')}</p>
+          <p className="font-num text-[30px] font-extrabold text-charcoal">{trips.length}</p>
+        </SectionCard>
+        <SectionCard>
+          <p className="text-[12.5px] font-semibold text-charcoal/60">{t('fare')}</p>
+          <p className="font-num text-[30px] font-extrabold text-emerald">৳{totalFare}</p>
+        </SectionCard>
       </div>
 
-      {trips.length === 0 && <p style={{ color: '#888' }}>{t('noCompletedTrips')}</p>}
+      {trips.length === 0 && (
+        <SectionCard className="py-10 text-center">
+          <p className="mb-2 text-4xl">🕘</p>
+          <p className="text-[14px] text-charcoal/50">{t('noCompletedTrips')}</p>
+        </SectionCard>
+      )}
 
-      {trips.map((t) => (
-        <div key={t.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-          <p style={{ marginBottom: 4 }}><b>{t.pickup} → {t.destination}</b></p>
-          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>
-            {typeLabel(t.ride_type)} · {vehicleLabel(t.vehicle_type)} · {new Date(t.created_at).toLocaleDateString()}
-          </p>
-          <p style={{ marginTop: 6, fontWeight: 'bold' }}>৳{t.fare}</p>
-        </div>
-      ))}
-    </div>
+      <div className="space-y-3">
+        {trips.map((ride) => (
+          <SectionCard key={ride.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-charcoal">{ride.pickup} → {ride.destination}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className={chipClass}>{typeLabel(ride.ride_type)}</span>
+                  <span className={chipClass}>{vehicleLabel(ride.vehicle_type)}</span>
+                  <span className={chipClass}>{new Date(ride.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <p className="font-num text-[22px] font-extrabold text-emerald">৳{ride.fare}</p>
+            </div>
+          </SectionCard>
+        ))}
+      </div>
+    </Screen>
   )
 }

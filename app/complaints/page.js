@@ -3,6 +3,11 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import PrimaryButton from '@/components/ui/PrimaryButton'
+import SectionCard from '@/components/ui/SectionCard'
+
+const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
 
 export default function ComplaintsPage() {
   const [userId, setUserId] = useState(null)
@@ -91,62 +96,76 @@ export default function ComplaintsPage() {
     return t('catFare')
   }
 
-  if (pageLoading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (pageLoading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('complaints')}</h1>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('complaints')}</h1>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-        <h3 style={{ marginTop: 0 }}>{t('fileAComplaint')}</h3>
+      <SectionCard className="mb-6">
+        <h3 className="mb-3 text-[16px] font-bold text-charcoal">{t('fileAComplaint')}</h3>
 
         {trips.length === 0 ? (
-          <p style={{ color: '#888', fontSize: 13 }}>{t('noCompletedTrips')}</p>
+          <p className="text-[13px] text-charcoal/50">{t('noCompletedTrips')}</p>
         ) : submitted ? (
-          <p style={{ color: 'green' }}>✅ {t('complaintSubmitted')}</p>
+          <p className="rounded-xl border-2 border-emerald/40 bg-mint px-4 py-3 font-semibold text-emerald-dark">
+            ✅ {t('complaintSubmitted')}
+          </p>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 12 }}>
-              <label>{t('selectARide')}</label><br/>
-              <select value={selectedRide} onChange={(e) => setSelectedRide(e.target.value)} style={{ width: '100%', padding: 8 }}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('selectARide')}</span>
+              <select value={selectedRide} onChange={(e) => setSelectedRide(e.target.value)} className={selectClass}>
                 {trips.map((r) => (
                   <option key={r.id} value={r.id}>{r.pickup} → {r.destination} (৳{r.fare})</option>
                 ))}
               </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label>{t('category')}</label><br/>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ width: '100%', padding: 8 }}>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('category')}</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
                 <option value="fare">{t('catFare')}</option>
                 <option value="behavior">{t('catBehavior')}</option>
                 <option value="safety">{t('catSafety')}</option>
                 <option value="noshow">{t('catNoShow')}</option>
               </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label>{t('describeIssue')}</label><br/>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} required
-                style={{ width: '100%', padding: 8, minHeight: 80 }} />
-            </div>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <button type="submit" disabled={loading} style={{ padding: 10, width: '100%' }}>
-              {t('submitComplaint')}
-            </button>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('describeIssue')}</span>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                className="min-h-28 w-full rounded-xl border-2 border-line bg-white p-3 text-[15px] font-semibold text-charcoal focus:border-emerald focus:outline-none"
+              />
+            </label>
+            {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
+            <PrimaryButton type="submit" disabled={loading}>{t('submitComplaint')}</PrimaryButton>
           </form>
         )}
-      </div>
+      </SectionCard>
 
-      <h3>{t('myComplaints')}</h3>
-      {myComplaints.length === 0 && <p style={{ color: '#888' }}>{t('noComplaintsYet')}</p>}
-      {myComplaints.map((c) => (
-        <div key={c.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{categoryLabel(c.category)}</p>
-          <p style={{ margin: '4px 0', fontSize: 13, color: '#555' }}>{c.description}</p>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 'bold', color: c.status === 'open' ? '#c00' : 'green' }}>
-            {c.status === 'open' ? t('open') : t('resolved')}
-          </p>
-        </div>
-      ))}
-    </div>
+      <h3 className="mb-3 text-[16px] font-bold text-charcoal">{t('myComplaints')}</h3>
+      {myComplaints.length === 0 && (
+        <p className="rounded-xl border-2 border-line-soft bg-white px-3 py-4 text-center text-[14px] text-charcoal/50">
+          {t('noComplaintsYet')}
+        </p>
+      )}
+      <div className="space-y-3">
+        {myComplaints.map((c) => (
+          <SectionCard key={c.id}>
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-bold text-charcoal">{categoryLabel(c.category)}</p>
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-bold ${c.status === 'open' ? 'border-danger/40 bg-danger/5 text-danger' : 'border-emerald/40 bg-mint text-emerald'}`}
+              >
+                {c.status === 'open' ? t('open') : t('resolved')}
+              </span>
+            </div>
+            <p className="mt-2 text-[13.5px] text-charcoal/70">{c.description}</p>
+          </SectionCard>
+        ))}
+      </div>
+    </Screen>
   )
 }

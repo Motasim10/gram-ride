@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import SectionCard from '@/components/ui/SectionCard'
 
 export default function NotificationsPage() {
   const { t, tn } = useLanguage()
@@ -32,18 +34,32 @@ export default function NotificationsPage() {
     load()
   }, [])
 
-    if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (loading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('notificationsTitle')}</h1>
-      {items.length === 0 && <p style={{ color: '#888' }}>{t('noNotificationsYet')}</p>}
-      {items.map((n) => (
-        <div key={n.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 8, background: n.read ? '#fff' : '#f5f9ff' }}>
-          <p style={{ margin: 0 }}>{n.msg_key ? tn(n.msg_key, n.msg_params) : n.message}</p>
-          <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString()}</p>
-        </div>
-      ))}
-    </div>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('notificationsTitle')}</h1>
+
+      {items.length === 0 && (
+        <SectionCard className="py-10 text-center">
+          <p className="mb-2 text-4xl">🔔</p>
+          <p className="text-[14px] text-charcoal/50">{t('noNotificationsYet')}</p>
+        </SectionCard>
+      )}
+
+      <div className="space-y-2">
+        {items.map((n) => (
+          <div
+            key={n.id}
+            className={`rounded-xl border-2 p-3 ${n.read ? 'border-line-soft bg-white' : 'border-emerald/40 bg-mint'}`}
+          >
+            <p className="text-[14.5px] font-semibold text-charcoal">
+              {n.msg_key ? tn(n.msg_key, n.msg_params) : n.message}
+            </p>
+            <p className="mt-1 text-[11.5px] text-charcoal/50">{new Date(n.created_at).toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+    </Screen>
   )
 }

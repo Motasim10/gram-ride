@@ -14,7 +14,6 @@ export default function BottomNav() {
 
   useEffect(() => {
     if (!SHOW_ON.includes(pathname)) { setRole(null); return }
-    if (role) return
     let active = true
     const loadRole = async () => {
       const { data: { user } } = await supabase.auth.getUser()

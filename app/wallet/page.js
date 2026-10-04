@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import SectionCard from '@/components/ui/SectionCard'
 
 export default function WalletPage() {
   const { t } = useLanguage()
@@ -44,34 +46,38 @@ export default function WalletPage() {
     load()
   }, [])
 
-    if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (loading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('walletStatsTitle')}</h1>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('walletStatsTitle')}</h1>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('totalEarnings')}</p>
-        <p style={{ fontSize: 28, fontWeight: 'bold', margin: '4px 0' }}>৳{totalEarnings}</p>
+      <div className="mb-4 rounded-2xl bg-emerald p-5 text-white">
+        <p className="text-[13px] font-semibold text-white/80">{t('totalEarnings')}</p>
+        <p className="font-num text-[40px] font-extrabold leading-tight">৳{totalEarnings}</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('totalTrips')}</p>
-          <p style={{ fontSize: 20, fontWeight: 'bold', margin: '4px 0' }}>{totalTrips}</p>
-        </div>
-        <div style={{ flex: 1, border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-          <p style={{ fontSize: 13, color: '#888', margin: 0 }}>{t('rating')}</p>
-          <p style={{ fontSize: 20, fontWeight: 'bold', margin: '4px 0' }}>
-            {avgRating ? `★ ${avgRating}` : t('noRatingsYet')}
-          </p>
-          {avgRating && <p style={{ fontSize: 11, color: '#888', margin: 0 }}>({ratingCount} {t('ratingsCount')})</p>}
-        </div>
+      <div className="grid grid-cols-2 gap-3">
+        <SectionCard>
+          <p className="text-[12.5px] font-semibold text-charcoal/60">{t('totalTrips')}</p>
+          <p className="font-num text-[28px] font-extrabold text-charcoal">{totalTrips}</p>
+        </SectionCard>
+        <SectionCard>
+          <p className="text-[12.5px] font-semibold text-charcoal/60">{t('rating')}</p>
+          {avgRating ? (
+            <>
+              <p className="font-num text-[28px] font-extrabold text-charcoal">
+                <span className="text-amber">★</span> {avgRating}
+              </p>
+              <p className="text-[11.5px] text-charcoal/50">({ratingCount} {t('ratingsCount')})</p>
+            </>
+          ) : (
+            <p className="mt-1 text-[15px] font-bold text-charcoal/50">{t('noRatingsYet')}</p>
+          )}
+        </SectionCard>
       </div>
 
-      <p style={{ fontSize: 13, color: '#888', textAlign: 'center', marginTop: 24 }}>
-        {t('walletNote')}
-      </p>
-    </div>
+      <p className="mt-6 text-center text-[13px] text-charcoal/50">{t('walletNote')}</p>
+    </Screen>
   )
 }

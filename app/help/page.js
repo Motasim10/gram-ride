@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import SectionCard from '@/components/ui/SectionCard'
 
 const HOTLINE_NUMBER = '01700-000000' // TODO: replace with your real support number
 
@@ -17,61 +19,66 @@ export default function HelpPage() {
   ]
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('helpSupport')}</h1>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('helpSupport')}</h1>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 24, textAlign: 'center' }}>
-        <p style={{ margin: '0 0 8px', fontSize: 14 }}>{t('hotlineTitle')}</p>
-        <a href={`tel:${HOTLINE_NUMBER}`} style={{ fontSize: 20, fontWeight: 'bold', color: '#0066cc', textDecoration: 'none' }}>
+      <div className="mb-6 rounded-2xl bg-emerald p-5 text-center text-white">
+        <p className="mb-3 text-[14px] font-semibold text-white/90">{t('hotlineTitle')}</p>
+        <a
+          href={`tel:${HOTLINE_NUMBER}`}
+          className="tap-target flex w-full items-center justify-center gap-2 rounded-2xl bg-white font-num text-[18px] font-extrabold text-emerald active:bg-mint"
+        >
           📞 {t('hotlineNumber')}
         </a>
       </div>
 
-      <h3>{t('howItWorks')}</h3>
-      <div style={{ marginBottom: 24 }}>
+      <h3 className="mb-3 text-[16px] font-bold text-charcoal">{t('howItWorks')}</h3>
+      <SectionCard className="mb-6 space-y-4">
         {[
           { title: t('step1Title'), text: t('step1Text') },
           { title: t('step2Title'), text: t('step2Text') },
           { title: t('step3Title'), text: t('step3Text') },
           { title: t('step4Title'), text: t('step4Text') },
         ].map((s, i) => (
-          <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#0066cc', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>
+          <div key={i} className="flex gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald text-[14px] font-bold text-white">
               {i + 1}
             </div>
             <div>
-              <p style={{ margin: 0, fontWeight: 'bold', fontSize: 14 }}>{s.title}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 13, color: '#555' }}>{s.text}</p>
+              <p className="text-[14.5px] font-bold text-charcoal">{s.title}</p>
+              <p className="mt-0.5 text-[13px] text-charcoal/60">{s.text}</p>
             </div>
           </div>
         ))}
-      </div>
+      </SectionCard>
 
-      <div style={{ border: '1px solid #f5c6c6', background: '#fff5f5', borderRadius: 8, padding: 12, marginBottom: 24, textAlign: 'center' }}>
-        <p style={{ margin: '0 0 8px', fontSize: 14 }}>{t('needToComplain')}</p>
-        <Link href="/complaints" style={{ display: 'inline-block', padding: '8px 16px', background: '#c00', color: 'white', borderRadius: 6, textDecoration: 'none', fontSize: 14 }}>
+      <div className="mb-6 rounded-2xl border-2 border-danger/40 bg-danger/5 p-4 text-center">
+        <p className="mb-3 text-[14px] font-semibold text-charcoal">{t('needToComplain')}</p>
+        <Link
+          href="/complaints"
+          className="tap-target flex w-full items-center justify-center rounded-2xl bg-danger text-[15px] font-bold text-white active:bg-danger-dark"
+        >
           {t('goToComplaints')}
         </Link>
       </div>
 
-      <h3>{t('faqTitle')}</h3>
-      {faqs.map((f, i) => (
-        <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-          <button
-            onClick={() => setOpenIndex(openIndex === i ? null : i)}
-            style={{ width: '100%', textAlign: 'left', padding: 12, background: '#fafafa', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            {f.q} {openIndex === i ? '▲' : '▼'}
-          </button>
-          {openIndex === i && (
-            <p style={{ padding: 12, margin: 0, fontSize: 14, color: '#555' }}>{f.a}</p>
-          )}
-        </div>
-      ))}
-
-      <Link href="/dashboard" style={{ display: 'block', textAlign: 'center', marginTop: 24, color: '#888' }}>
-        ← {t('backToDashboard')}
-      </Link>
-    </div>
+      <h3 className="mb-3 text-[16px] font-bold text-charcoal">{t('faqTitle')}</h3>
+      <div className="space-y-2">
+        {faqs.map((f, i) => (
+          <div key={i} className="overflow-hidden rounded-xl border-2 border-line-soft bg-white">
+            <button
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-[14.5px] font-bold text-charcoal"
+            >
+              <span>{f.q}</span>
+              <span className="text-emerald">{openIndex === i ? '▲' : '▼'}</span>
+            </button>
+            {openIndex === i && (
+              <p className="border-t border-line-soft px-3 py-3 text-[14px] text-charcoal/70">{f.a}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </Screen>
   )
 }

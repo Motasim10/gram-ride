@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import Screen from '@/components/ui/Screen'
+import PrimaryButton from '@/components/ui/PrimaryButton'
+import SectionCard from '@/components/ui/SectionCard'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null)
@@ -46,36 +49,55 @@ export default function ProfilePage() {
     router.push('/login')
   }
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>{t('loading')}</p>
+  if (loading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{t('myProfile')}</h1>
+    <Screen>
+      <h1 className="mb-5 text-[22px] font-bold text-charcoal">{t('myProfile')}</h1>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-        <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>{t('name')}</p>
-        <p style={{ margin: '0 0 12px', fontWeight: 'bold' }}>{profile.name}</p>
-
-        <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>{t('phone')}</p>
-        <p style={{ margin: '0 0 12px', fontWeight: 'bold' }}>{profile.phone}</p>
-
-        <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>{t('currentRole')}</p>
-        <p style={{ margin: '0 0 12px', fontWeight: 'bold' }}>{t(profile.role)}</p>
-
-        <label style={{ fontSize: 13, color: '#888' }}>{t('areaLabel')}</label><br/>
-        <input value={area} onChange={(e) => setArea(e.target.value)} style={{ width: '100%', padding: 8, marginBottom: 8 }} />
-        <button onClick={handleSaveArea} disabled={saving} style={{ padding: 10, width: '100%' }}>
-          {saved ? t('changesSaved') : t('saveChanges')}
-        </button>
+      <div className="mb-5 flex items-center gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-mint text-2xl font-bold text-emerald">
+          {(profile.name || '?').trim().charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-xl font-bold text-charcoal">{profile.name}</p>
+          <span className="mt-1 inline-block rounded-full bg-mint px-3 py-1 text-[12px] font-bold text-emerald">{t(profile.role)}</span>
+        </div>
       </div>
 
-      <button onClick={handleSwitchRole} style={{ padding: 10, width: '100%', marginBottom: 8 }}>
-        {profile.role === 'passenger' ? t('switchToDriver') : t('switchToPassenger')}
-      </button>
+      <SectionCard className="mb-4 space-y-4">
+        <div>
+          <p className="text-[13px] font-semibold text-charcoal/60">{t('phone')}</p>
+          <p className="font-num text-[17px] font-bold text-charcoal">{profile.phone}</p>
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold text-charcoal/60">{t('currentRole')}</p>
+          <p className="font-bold text-charcoal">{t(profile.role)}</p>
+        </div>
+        <label className="block">
+          <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('areaLabel')}</span>
+          <input
+            value={area}
+            onChange={(e) => setArea(e.target.value)}
+            className="tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none"
+          />
+        </label>
+        <PrimaryButton onClick={handleSaveArea} disabled={saving}>
+          {saved ? `✓ ${t('changesSaved')}` : t('saveChanges')}
+        </PrimaryButton>
+      </SectionCard>
 
-      <button onClick={handleLogout} style={{ padding: 10, width: '100%', background: 'none', border: '1px solid #c00', color: '#c00' }}>
-        {t('logout')}
-      </button>
-    </div>
+      <div className="space-y-3">
+        <PrimaryButton tone="outline" onClick={handleSwitchRole}>
+          {profile.role === 'passenger' ? t('switchToDriver') : t('switchToPassenger')}
+        </PrimaryButton>
+        <button
+          onClick={handleLogout}
+          className="tap-target w-full rounded-2xl border-2 border-danger bg-white text-[15px] font-bold text-danger active:bg-danger/10"
+        >
+          {t('logout')}
+        </button>
+      </div>
+    </Screen>
   )
 }
