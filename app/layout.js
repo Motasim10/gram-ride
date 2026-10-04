@@ -2,6 +2,7 @@ import { Hind_Siliguri, Manrope } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import LanguageToggle from "@/lib/LanguageToggle";
+import BottomNav from "@/components/ui/BottomNav";
 
 const hind = Hind_Siliguri({
   variable: "--font-hind",
@@ -27,6 +28,7 @@ export default function RootLayout({ children }) {
         <LanguageProvider>
           <LanguageToggle />
           {children}
+          <BottomNav />
         </LanguageProvider>
       </body>
     </html>
