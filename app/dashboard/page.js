@@ -4,10 +4,12 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n'
+import NotificationBell from '@/lib/NotificationBell'
+import Screen from '@/components/ui/Screen'
+import SectionCard from '@/components/ui/SectionCard'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
-  const [unreadCount, setUnreadCount] = useState(0)
   const router = useRouter()
   const { t } = useLanguage()
 
@@ -20,56 +22,59 @@ export default function Dashboard() {
       }
       const { data } = await supabase.from('profiles').select('*').eq('user_id', user.id).single()
       setProfile(data)
-
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
-      setUnreadCount(count || 0)
-
-      const channel = supabase
-        .channel('dash-notif-' + user.id + '-' + Math.random().toString(36).slice(2))
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
-          setUnreadCount((c) => c + 1)
-        })
-        .subscribe()
-
-      return () => supabase.removeChannel(channel)
     }
     load()
   }, [])
 
-  if (!profile) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  if (!profile) return <Screen><p className="mt-24 text-center text-charcoal/60">...</p></Screen>
+
+  const isDriver = profile.role === 'driver'
+  const tiles = [
+    { href: '/history', icon: '🕘', label: t('tripHistory') },
+    ...(isDriver ? [{ href: '/wallet', icon: '💰', label: t('walletStats') }] : []),
+    { href: '/complaints', icon: '📝', label: t('complaints') },
+    { href: '/help', icon: '💬', label: t('helpSupport') },
+  ]
 
   return (
-    <div style={{ maxWidth: 400, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>{t('welcome')}, {profile.name}! 🎉</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link href="/profile" style={{ textDecoration: 'none', fontSize: 24 }}>👤</Link>
-          <Link href="/notifications" style={{ textDecoration: 'none', position: 'relative', fontSize: 24 }}>
-            🔔
-            {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: -4, right: -8, background: 'red', color: 'white', borderRadius: '50%', fontSize: 11, padding: '1px 5px' }}>
-                {unreadCount}
-              </span>
-            )}
-          </Link>
+    <Screen>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-xl font-bold text-emerald">
+            {(profile.name || '?').trim().charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-[13px] text-charcoal/60">{t('welcome')}</p>
+            <p className="text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <NotificationBell />
+          <Link href="/profile" className="text-2xl" aria-label={t('profile')}>👤</Link>
         </div>
       </div>
-      <p>{t('loggedInAs')} {t(profile.role)}.</p>
-      {profile.role === 'passenger' ? (
-        <Link href="/passenger"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('requestRide')}</button></Link>
-      ) : (
-        <>
-          <Link href="/driver"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('viewRequests')}</button></Link>
-          <Link href="/wallet"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('walletStats')}</button></Link>
-        </>
-      )}
-      <Link href="/history"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('tripHistory')}</button></Link>
-      <Link href="/complaints"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('complaints')}</button></Link>
-      <Link href="/help"><button style={{ padding: 10, width: '100%', marginTop: 12 }}>{t('helpSupport')}</button></Link>
-    </div>
+
+      <span className="mt-3 inline-block rounded-full bg-mint px-3 py-1 text-[12px] font-bold text-emerald">
+        {t(profile.role)}
+      </span>
+
+      <Link
+        href={isDriver ? '/driver' : '/passenger'}
+        className="rise-in mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald py-5 text-[17px] font-bold text-white active:bg-emerald-dark"
+      >
+        🚗 {isDriver ? t('viewRequests') : t('requestRide')}
+      </Link>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {tiles.map((tile) => (
+          <Link key={tile.href} href={tile.href}>
+            <SectionCard className="flex h-28 flex-col items-center justify-center gap-2 text-center active:bg-mint">
+              <span className="text-3xl">{tile.icon}</span>
+              <span className="text-[14px] font-bold text-charcoal">{tile.label}</span>
+            </SectionCard>
+          </Link>
+        ))}
+      </div>
+    </Screen>
   )
 }

@@ -83,7 +83,7 @@ export default function DriverPage() {
         .subscribe()
       myTripChannelRef.current = myTripChannel
 
-      await loadReserveRequests()
+      await loadReserveRequests(user.id)
       subscribeToRideChanges(user.id)
       setLoading(false)
     }
@@ -176,14 +176,14 @@ export default function DriverPage() {
     bidsChannelRef.current = channel
   }, [negotiatingRide?.id])
 
-  const loadReserveRequests = async () => {
+  const loadReserveRequests = async (uid = userId) => {
     const { data: accepted } = await supabase.from('rides').select('*')
-      .eq('driver_id', userId).eq('status', 'accepted').eq('ride_type', 'reserve')
+      .eq('driver_id', uid).eq('status', 'accepted').eq('ride_type', 'reserve')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     setActiveReserveRide(accepted || null)
 
     const { data: negotiating } = await supabase.from('rides').select('*')
-      .eq('driver_id', userId).eq('status', 'negotiating').eq('ride_type', 'reserve')
+      .eq('driver_id', uid).eq('status', 'negotiating').eq('ride_type', 'reserve')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     setNegotiatingRide(negotiating || null)
 
