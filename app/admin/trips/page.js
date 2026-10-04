@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { StatusBadge, EmptyState } from '@/components/admin/AdminUI'
+import { IconClock, IconMapPin } from '@/components/admin/Icons'
 import { notify } from '@/lib/notify'
 
 export default function AdminTripsPage() {
@@ -69,31 +70,56 @@ export default function AdminTripsPage() {
     await loadTrips()
   }
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  if (loading) return <p className="mt-16 text-center text-charcoal/60">Loading...</p>
   if (!authorized) return null
 
   return (
-    <div style={{ maxWidth: 700, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
-      <Link href="/admin">← Back to Dashboard</Link>
-      <h1>Active Trips ({trips.length})</h1>
-      <p style={{ fontSize: 13, color: '#888' }}>
-        Every driver currently online or mid-trip. If a driver's phone lost connection or their browser closed
-        without going offline properly, their trip can get stuck here — use "Force Offline" to clear it and let
-        the next driver in that route's queue take over.
+    <div className="space-y-4">
+      <p className="max-w-3xl text-[13px] text-charcoal/55">
+        Every driver currently online or mid-trip. If a driver&apos;s phone lost connection or their browser closed
+        without going offline properly, their trip can get stuck here. Use Force offline to clear it and let
+        the next driver in that route&apos;s queue take over.
       </p>
 
-      {trips.length === 0 && <p style={{ color: '#888' }}>No drivers online right now.</p>}
-      {trips.map((t) => (
-        <div key={t.id} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{t.driver.name || t.driver_id}</p>
-          <p style={{ margin: '2px 0', fontSize: 13, color: '#888' }}>{t.driver.phone || ''}</p>
-          <p style={{ margin: '4px 0', fontSize: 13 }}>
-            Route: {t.routeName} · Vehicle: {t.vehicle_type === 'auto' ? 'Auto' : 'CNG'} · Status: <b>{t.status}</b>
-          </p>
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#888' }}>Online since {new Date(t.created_at).toLocaleString()}</p>
-          <button onClick={() => forceOffline(t)} style={{ padding: '6px 12px', color: '#c00' }}>Force Offline</button>
-        </div>
-      ))}
+      {trips.length === 0 && <EmptyState icon={<IconClock size={28} />} text="No drivers online right now." />}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {trips.map((t) => (
+          <div key={t.id} className="rounded-2xl border-2 border-line-soft bg-white p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mint text-[15px] font-bold text-emerald">
+                  {(t.driver.name || '?').trim().charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[14.5px] font-bold text-charcoal">{t.driver.name || t.driver_id}</p>
+                  {t.driver.phone && (
+                    <a href={`tel:${t.driver.phone}`} className="font-num text-[12.5px] font-semibold text-charcoal/55">{t.driver.phone}</a>
+                  )}
+                </div>
+              </div>
+              <StatusBadge tone={t.status === 'open' ? 'emerald' : 'amber'}>
+                {t.status === 'open' ? 'Online' : 'On trip'}
+              </StatusBadge>
+            </div>
+
+            <p className="mb-1 flex flex-wrap items-center gap-1.5 text-[14px] font-bold text-charcoal">
+              <IconMapPin size={13} className="shrink-0 text-emerald" />{t.routeName}
+            </p>
+            <div className="mb-3 mt-2 flex flex-wrap gap-1.5">
+              <StatusBadge>{t.vehicle_type === 'auto' ? 'Auto' : 'CNG'}</StatusBadge>
+              <StatusBadge>Online since {new Date(t.created_at).toLocaleString()}</StatusBadge>
+            </div>
+
+            <button
+              onClick={() => forceOffline(t)}
+              className="rounded-lg border-2 border-danger/40 px-3 py-1.5 text-[12.5px] font-bold text-danger hover:bg-danger/5"
+            >
+              Force offline
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
