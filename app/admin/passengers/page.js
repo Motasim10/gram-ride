@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Tabs, SearchBox, Panel, StatusBadge } from '@/components/admin/AdminUI'
 
 export default function AdminPassengersPage() {
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
   const [passengers, setPassengers] = useState([])
+  const [tab, setTab] = useState('all')
+  const [query, setQuery] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -42,30 +44,78 @@ export default function AdminPassengersPage() {
     setPassengers((prev) => prev.map((p) => (p.user_id === passenger.user_id ? { ...p, flagged: !p.flagged } : p)))
   }
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  const filtered = passengers.filter((p) => {
+    const matchesTab = tab === 'all' ? true : tab === 'flagged' ? p.flagged : !p.flagged
+    const q = query.trim().toLowerCase()
+    const matchesQuery = !q || (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q)
+    return matchesTab && matchesQuery
+  })
+
+  if (loading) return <p className="mt-16 text-center text-charcoal/60">Loading...</p>
   if (!authorized) return null
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
-      <Link href="/admin">← Back to Dashboard</Link>
-      <h1>Passengers ({passengers.length})</h1>
-      {passengers.length === 0 && <p style={{ color: '#888' }}>No passengers registered yet.</p>}
-      {passengers.map((p) => (
-        <div key={p.user_id} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 10, background: p.flagged ? '#fff5f5' : '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{p.name} {p.flagged && '🚩'}</p>
-              <p style={{ margin: '2px 0', fontSize: 13, color: '#888' }}>{p.phone}</p>
-              <p style={{ margin: '2px 0', fontSize: 13 }}>
-                Trips: {p.tripCount} · Total Spent: ৳{p.totalSpent}
-              </p>
-            </div>
-            <button onClick={() => toggleFlag(p)} style={{ padding: '6px 12px', alignSelf: 'center' }}>
-              {p.flagged ? 'Unflag' : 'Flag'}
-            </button>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'all', label: 'All', count: passengers.length },
+            { value: 'active', label: 'Active', count: passengers.filter((p) => !p.flagged).length },
+            { value: 'flagged', label: 'Flagged', count: passengers.filter((p) => p.flagged).length },
+          ]}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search by name or phone" />
+      </div>
+
+      <Panel flush>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b-2 border-line-soft text-[12px] font-bold text-charcoal/45">
+                <th className="px-5 py-3">Passenger</th>
+                <th className="px-5 py-3">Area</th>
+                <th className="px-5 py-3">Trips</th>
+                <th className="px-5 py-3">Total spent</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr key={p.user_id} className="border-b border-line-soft last:border-0">
+                  <td className="px-5 py-3">
+                    <p className="text-[13.5px] font-bold text-charcoal">{p.name}</p>
+                    <p className="font-num text-[12px] font-semibold text-charcoal/45">{p.phone}</p>
+                  </td>
+                  <td className="px-5 py-3 text-[13px] font-semibold text-charcoal/70">{p.area || '—'}</td>
+                  <td className="px-5 py-3 font-num text-[13px] font-semibold text-charcoal/70">{p.tripCount}</td>
+                  <td className="px-5 py-3 font-num text-[13px] font-extrabold text-emerald-dark">৳{p.totalSpent}</td>
+                  <td className="px-5 py-3">
+                    <StatusBadge tone={p.flagged ? 'red' : 'emerald'}>{p.flagged ? 'Flagged' : 'Active'}</StatusBadge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <button
+                      onClick={() => toggleFlag(p)}
+                      className={`text-[12.5px] font-bold ${p.flagged ? 'text-emerald' : 'text-danger'}`}
+                    >
+                      {p.flagged ? 'Unflag' : 'Flag'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="px-5 py-10 text-center text-[13px] font-semibold text-charcoal/40">
+                    {passengers.length === 0 ? 'No passengers registered yet.' : 'No results found.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      ))}
+      </Panel>
     </div>
   )
 }

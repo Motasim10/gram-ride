@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Tabs, StatusBadge, EmptyState } from '@/components/admin/AdminUI'
+import { IconAlertTriangle } from '@/components/admin/Icons'
 
 export default function AdminDisputesPage() {
   const [authorized, setAuthorized] = useState(false)
@@ -61,38 +62,49 @@ export default function AdminDisputesPage() {
 
   const visible = disputes.filter((d) => filter === 'all' || d.status === filter)
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  if (loading) return <p className="mt-16 text-center text-charcoal/60">Loading...</p>
   if (!authorized) return null
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
-      <Link href="/admin">← Back to Dashboard</Link>
-      <h1>Disputes ({disputes.filter((d) => d.status === 'open').length} open)</h1>
+    <div className="space-y-4">
+      <Tabs
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'open', label: 'Open', count: disputes.filter((d) => d.status === 'open').length },
+          { value: 'resolved', label: 'Resolved', count: disputes.filter((d) => d.status === 'resolved').length },
+          { value: 'all', label: 'All', count: disputes.length },
+        ]}
+      />
 
-      <div style={{ marginBottom: 16 }}>
-        <button onClick={() => setFilter('open')} style={{ padding: 8, marginRight: 8, fontWeight: filter === 'open' ? 'bold' : 'normal' }}>Open</button>
-        <button onClick={() => setFilter('resolved')} style={{ padding: 8, marginRight: 8, fontWeight: filter === 'resolved' ? 'bold' : 'normal' }}>Resolved</button>
-        <button onClick={() => setFilter('all')} style={{ padding: 8, fontWeight: filter === 'all' ? 'bold' : 'normal' }}>All</button>
-      </div>
+      {visible.length === 0 && <EmptyState icon={<IconAlertTriangle size={28} />} text="Nothing here." />}
 
-      {visible.length === 0 && <p style={{ color: '#888' }}>Nothing here.</p>}
-      {visible.map((d) => (
-        <div key={d.id} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{categoryLabel(d.category)}</p>
-          <p style={{ margin: '4px 0', fontSize: 13, color: '#555' }}>{d.description}</p>
-          <p style={{ margin: '2px 0', fontSize: 12, color: '#888' }}>
-            Filed by: {nameFor(d.filed_by)} · Against: {nameFor(d.against)} · Ride #{d.ride_id}
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 'bold', color: d.status === 'open' ? '#c00' : 'green' }}>
-              {d.status === 'open' ? 'Open' : 'Resolved'}
-            </span>
+      <div className="space-y-3">
+        {visible.map((d) => (
+          <div key={d.id} className="rounded-2xl border-2 border-line-soft bg-white p-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="font-num text-[12px] font-bold text-charcoal/40">#{d.id}</p>
+                <StatusBadge tone="amber">{categoryLabel(d.category)}</StatusBadge>
+                <StatusBadge tone={d.status === 'open' ? 'red' : 'emerald'}>{d.status === 'open' ? 'Open' : 'Resolved'}</StatusBadge>
+              </div>
+              <p className="text-[11.5px] font-semibold text-charcoal/40">{new Date(d.created_at).toLocaleDateString()}</p>
+            </div>
+            <p className="mb-2 text-[13.5px] font-semibold leading-relaxed text-charcoal">{d.description}</p>
+            <p className="mb-3 text-[12px] font-semibold text-charcoal/50">
+              Ride #{d.ride_id} · Filed by: {nameFor(d.filed_by)} · Against: {nameFor(d.against)}
+            </p>
             {d.status === 'open' && (
-              <button onClick={() => resolve(d.id)} style={{ padding: '6px 12px' }}>Mark Resolved</button>
+              <button
+                onClick={() => resolve(d.id)}
+                className="rounded-lg bg-emerald px-4 py-2 text-[12.5px] font-bold text-white active:bg-emerald-dark"
+              >
+                Mark resolved
+              </button>
             )}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }

@@ -2,12 +2,15 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Tabs, SearchBox, Panel, StatusBadge } from '@/components/admin/AdminUI'
+import { IconStar } from '@/components/admin/Icons'
 
 export default function AdminDriversPage() {
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
   const [drivers, setDrivers] = useState([])
+  const [tab, setTab] = useState('all')
+  const [query, setQuery] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -44,30 +47,88 @@ export default function AdminDriversPage() {
     setDrivers((prev) => prev.map((d) => (d.user_id === driver.user_id ? { ...d, flagged: !d.flagged } : d)))
   }
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  const filtered = drivers.filter((d) => {
+    const matchesTab = tab === 'all' ? true : tab === 'flagged' ? d.flagged : !d.flagged
+    const q = query.trim().toLowerCase()
+    const matchesQuery = !q || (d.name || '').toLowerCase().includes(q) || (d.phone || '').includes(q)
+    return matchesTab && matchesQuery
+  })
+
+  if (loading) return <p className="mt-16 text-center text-charcoal/60">Loading...</p>
   if (!authorized) return null
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
-      <Link href="/admin">← Back to Dashboard</Link>
-      <h1>Drivers ({drivers.length})</h1>
-      {drivers.length === 0 && <p style={{ color: '#888' }}>No drivers registered yet.</p>}
-      {drivers.map((d) => (
-        <div key={d.user_id} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 12, marginBottom: 10, background: d.flagged ? '#fff5f5' : '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: 'bold' }}>{d.name} {d.flagged && '🚩'}</p>
-              <p style={{ margin: '2px 0', fontSize: 13, color: '#888' }}>{d.phone}</p>
-              <p style={{ margin: '2px 0', fontSize: 13 }}>
-                Trips: {d.tripCount} · Earnings: ৳{d.totalEarnings} · Rating: {d.avgRating ? `★ ${d.avgRating}` : 'N/A'}
-              </p>
-            </div>
-            <button onClick={() => toggleFlag(d)} style={{ padding: '6px 12px', alignSelf: 'center' }}>
-              {d.flagged ? 'Unflag' : 'Flag'}
-            </button>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'all', label: 'All', count: drivers.length },
+            { value: 'active', label: 'Active', count: drivers.filter((d) => !d.flagged).length },
+            { value: 'flagged', label: 'Flagged', count: drivers.filter((d) => d.flagged).length },
+          ]}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Search by name or phone" />
+      </div>
+
+      <Panel flush>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b-2 border-line-soft text-[12px] font-bold text-charcoal/45">
+                <th className="px-5 py-3">Driver</th>
+                <th className="px-5 py-3">Area</th>
+                <th className="px-5 py-3">Trips</th>
+                <th className="px-5 py-3">Earnings</th>
+                <th className="px-5 py-3">Rating</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((d) => (
+                <tr key={d.user_id} className="border-b border-line-soft last:border-0">
+                  <td className="px-5 py-3">
+                    <p className="text-[13.5px] font-bold text-charcoal">{d.name}</p>
+                    <p className="font-num text-[12px] font-semibold text-charcoal/45">{d.phone}</p>
+                  </td>
+                  <td className="px-5 py-3 text-[13px] font-semibold text-charcoal/70">{d.area || '—'}</td>
+                  <td className="px-5 py-3 font-num text-[13px] font-semibold text-charcoal/70">{d.tripCount}</td>
+                  <td className="px-5 py-3 font-num text-[13px] font-extrabold text-emerald-dark">৳{d.totalEarnings}</td>
+                  <td className="px-5 py-3">
+                    {d.avgRating ? (
+                      <span className="flex items-center gap-1 font-num text-[13px] font-bold text-amber-dark">
+                        <IconStar size={12} className="fill-amber text-amber" />{d.avgRating}
+                      </span>
+                    ) : (
+                      <span className="text-[13px] text-charcoal/30">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
+                    <StatusBadge tone={d.flagged ? 'red' : 'emerald'}>{d.flagged ? 'Flagged' : 'Active'}</StatusBadge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <button
+                      onClick={() => toggleFlag(d)}
+                      className={`text-[12.5px] font-bold ${d.flagged ? 'text-emerald' : 'text-danger'}`}
+                    >
+                      {d.flagged ? 'Unflag' : 'Flag'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="px-5 py-10 text-center text-[13px] font-semibold text-charcoal/40">
+                    {drivers.length === 0 ? 'No drivers registered yet.' : 'No results found.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      ))}
+      </Panel>
     </div>
   )
 }
