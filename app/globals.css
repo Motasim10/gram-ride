@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-emerald: #00875A;
+  --color-emerald-dark: #046A46;
+  --color-emerald-deep: #035338;
+  --color-mint: #E6F4EA;
+  --color-amber: #F59E0B;
+  --color-amber-dark: #B45309;
+  --color-offwhite: #F9FAFB;
+  --color-charcoal: #111827;
+  --color-line: #CFE3D8;
+  --color-line-soft: #E3E9E6;
+  --color-danger: #C23B3B;
+  --color-danger-dark: #9E2E2E;
+  --color-sidebar: #0B2318;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-bn: var(--font-hind), sans-serif;
+  --font-num: var(--font-manrope), sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html, body { background: #F9FAFB; }
+body { color: #111827; font-family: var(--font-hind), sans-serif; }
+* { -webkit-tap-highlight-color: transparent; }
+.tap-target { min-height: 48px; }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.live-dot { animation: livePulse 1.8s infinite; }
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise-in { animation: riseIn 0.35s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .rise-in { animation: none; }
 }
