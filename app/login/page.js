@@ -1,8 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
 import { phoneToEmail, normalizePin } from '@/lib/phoneAuth'
 import Screen from '@/components/ui/Screen'
@@ -13,7 +13,6 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { t } = useLanguage()
 
   const isEmail = identifier.includes('@')
@@ -33,14 +32,6 @@ export default function Login() {
     }
     router.push('/dashboard')
   }
-
-  useEffect(() => {
-    const email = searchParams.get('email')
-    const password = searchParams.get('password')
-    if (email && password) {
-      attemptLogin(email, password)
-    }
-  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
