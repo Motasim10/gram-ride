@@ -110,6 +110,7 @@ export default function DriverPage() {
   const [routeTrips, setRouteTrips] = useState([])
   const [queueStatus, setQueueStatus] = useState([])
   const myTripChannelRef = useRef(null)
+  const profileChannelRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
@@ -119,6 +120,14 @@ export default function DriverPage() {
 
       const { data: profile } = await supabase.from('profiles').select('flagged').eq('user_id', user.id).single()
       setIsFlagged(profile?.flagged || false)
+
+      const profileChannel = supabase
+        .channel('my-profile-' + user.id + '-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `user_id=eq.${user.id}` }, (payload) => {
+          setIsFlagged(payload.new.flagged || false)
+        })
+        .subscribe()
+      profileChannelRef.current = profileChannel
 
       const { data: routeRows } = await supabase.from('routes').select('*').order('id')
       setRoutes(routeRows || [])
@@ -158,6 +167,7 @@ export default function DriverPage() {
       if (tripChannelRef.current) supabase.removeChannel(tripChannelRef.current)
       if (queueChannelRef.current) supabase.removeChannel(queueChannelRef.current)
       if (myTripChannelRef.current) supabase.removeChannel(myTripChannelRef.current)
+      if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current)
     }
   }, [])
 
@@ -167,7 +177,11 @@ export default function DriverPage() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && userId) loadReserveRequests()
+      if (document.visibilityState === 'visible' && userId) {
+        loadReserveRequests()
+        supabase.from('profiles').select('flagged').eq('user_id', userId).single()
+          .then(({ data }) => setIsFlagged(data?.flagged || false))
+      }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)

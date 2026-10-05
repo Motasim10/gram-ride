@@ -113,6 +113,7 @@ export default function PassengerPage() {
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
+  const profileChannelRef = useRef(null)
   const { t } = useLanguage()
 
   const capacity = CAPACITY[vehicleType]
@@ -132,6 +133,14 @@ export default function PassengerPage() {
       const { data: profile } = await supabase.from('profiles').select('flagged').eq('user_id', user.id).single()
       setIsFlagged(profile?.flagged || false)
 
+      const profileChannel = supabase
+        .channel('my-profile-' + user.id + '-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `user_id=eq.${user.id}` }, (payload) => {
+          setIsFlagged(payload.new.flagged || false)
+        })
+        .subscribe()
+      profileChannelRef.current = profileChannel
+
       const { data: routeRows } = await supabase.from('routes').select('*').order('id')
       const { data: stopRows } = await supabase.from('route_stops').select('*').order('position')
       const { data: fareRows } = await supabase.from('route_fares').select('*')
@@ -149,13 +158,18 @@ export default function PassengerPage() {
     load()
     return () => {
       if (rideChannelRef.current) supabase.removeChannel(rideChannelRef.current)
+      if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current)
       if (bidsChannelRef.current) supabase.removeChannel(bidsChannelRef.current)
     }
   }, [])
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && userId) checkActiveRide(userId)
+      if (document.visibilityState === 'visible' && userId) {
+        checkActiveRide(userId)
+        supabase.from('profiles').select('flagged').eq('user_id', userId).single()
+          .then(({ data }) => setIsFlagged(data?.flagged || false))
+      }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
