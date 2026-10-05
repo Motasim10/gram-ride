@@ -110,6 +110,25 @@ export default function PassengerPage() {
     const timer = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [activeRide?.status])
+  const [tripStatus, setTripStatus] = useState(null)
+  useEffect(() => {
+    const tripId = activeRide?.trip_id
+    if (!tripId) { setTripStatus(null); return }
+    let cancelled = false
+    const refresh = async () => {
+      const { data } = await supabase.from('trips').select('status').eq('id', tripId).single()
+      if (!cancelled) setTripStatus(data?.status || null)
+    }
+    refresh()
+    const timer = setInterval(refresh, 10000)
+    const channel = supabase
+      .channel('my-trip-' + tripId + '-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` }, (payload) => {
+        setTripStatus(payload.new.status)
+      })
+      .subscribe()
+    return () => { cancelled = true; clearInterval(timer); supabase.removeChannel(channel) }
+  }, [activeRide?.trip_id])
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
@@ -388,13 +407,14 @@ export default function PassengerPage() {
     setLoading(false)
   }
 
-    const handleSendSos = async () => {
-    await supabase.from('sos_alerts').insert({
+  const handleSendSos = async () => {
+    const { error: sosError } = await supabase.from('sos_alerts').insert({
       user_id: userId,
       ride_id: activeRide.id,
       details: `Pickup: ${activeRide.pickup}, Destination: ${activeRide.destination}, Status: ${activeRide.status}`,
     })
     setShowSosConfirm(false)
+    if (sosError) { setError(sosError.message); return }
     setSosSent(true)
   }
 
@@ -483,6 +503,7 @@ export default function PassengerPage() {
       { key: 'done', label: t('stepDone'), active: currentIndex >= 3 },
     ]
     const expired = activeRide.expires_at && nowMs >= new Date(activeRide.expires_at).getTime()
+    const sosAllowed = activeRide.status === 'accepted' && (activeRide.ride_type === 'reserve' || tripStatus === 'in_progress')
 
     return (
       <Screen>
@@ -491,12 +512,12 @@ export default function PassengerPage() {
             <h1 className="text-[22px] font-bold text-charcoal">{t('trackingTitle')}</h1>
             <NotificationBell />
           </div>
-          {!showSosConfirm && !sosSent && (
+          {sosAllowed && !showSosConfirm && !sosSent && (
             <button
               onClick={() => setShowSosConfirm(true)}
-              className="flex h-9 items-center gap-1 rounded-full bg-danger px-3 text-[12px] font-bold text-white active:bg-danger-dark"
+              className="flex h-8 items-center rounded-full bg-danger px-3 text-[12px] font-extrabold tracking-wide text-white active:bg-danger-dark"
             >
-              🆘 {t('sos')}
+              {t('sos')}
             </button>
           )}
         </div>

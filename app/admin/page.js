@@ -53,8 +53,7 @@ export default function AdminPage() {
       })
 
       const { count: liveCount } = await supabase.from('rides').select('*', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)')
-      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const { count: sosCount } = await supabase.from('sos_alerts').select('*', { count: 'exact', head: true }).gte('created_at', dayAgo)
+      const { count: sosCount } = await supabase.from('sos_alerts').select('*', { count: 'exact', head: true }).eq('status', 'open')
       setAttention({ liveRides: liveCount || 0, sos: sosCount || 0 })
 
       const { data: recentRides } = await supabase
@@ -74,7 +73,7 @@ export default function AdminPage() {
 
   const attentionRows = [
     { href: '/admin/disputes', label: 'Open disputes', value: stats.openDisputes, hot: stats.openDisputes > 0, Icon: IconAlertTriangle },
-    { href: '/admin/sos', label: 'SOS alerts (last 24h)', value: attention.sos, hot: attention.sos > 0, danger: true, Icon: IconShieldCheck },
+    { href: '/admin/sos', label: 'Open SOS alerts', value: attention.sos, hot: attention.sos > 0, danger: true, Icon: IconShieldCheck },
     { href: '/admin/rides', label: 'Rides in progress', value: attention.liveRides, hot: false, Icon: IconCar },
   ]
 

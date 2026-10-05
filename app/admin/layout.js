@@ -19,7 +19,7 @@ const NAV = [
   { href: '/admin/disputes', label: 'Disputes', Icon: IconAlertTriangle, badge: 'disputes' },
   { href: '/admin/payouts', label: 'Payouts', Icon: IconWallet },
   { href: '/admin/analytics', label: 'Analytics', Icon: IconBarChart },
-  { href: '/admin/sos', label: 'SOS alerts', Icon: IconShieldCheck },
+  { href: '/admin/sos', label: 'SOS alerts', Icon: IconShieldCheck, badge: 'sos' },
 ]
 
 function isActive(item, pathname) {
@@ -79,7 +79,7 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname()
   const router = useRouter()
   const [admin, setAdmin] = useState(null)
-  const [counts, setCounts] = useState({ rides: 0, disputes: 0 })
+  const [counts, setCounts] = useState({ rides: 0, disputes: 0, sos: 0 })
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -98,7 +98,8 @@ export default function AdminLayout({ children }) {
     const loadCounts = async () => {
       const { count: rides } = await supabase.from('rides').select('*', { count: 'exact', head: true }).not('status', 'in', '(completed,cancelled)')
       const { count: disputes } = await supabase.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'open')
-      setCounts({ rides: rides || 0, disputes: disputes || 0 })
+      const { count: sos } = await supabase.from('sos_alerts').select('*', { count: 'exact', head: true }).eq('status', 'open')
+      setCounts({ rides: rides || 0, disputes: disputes || 0, sos: sos || 0 })
     }
     loadCounts()
     setMenuOpen(false)
