@@ -2,25 +2,42 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { KpiCard, Panel, EmptyState } from '@/components/admin/AdminUI'
+import { IconCar, IconWallet, IconTrendingUp, IconAutoRickshaw, IconMapPin } from '@/components/admin/Icons'
+
+const dhakaDay = (value) => new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
 
 function lastNDays(n) {
   const days = []
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(d.toISOString().slice(0, 10))
-  }
+  for (let i = n - 1; i >= 0; i--) days.push(dhakaDay(Date.now() - i * 24 * 60 * 60 * 1000))
   return days
+}
+
+function BarChart({ data, valueFmt }) {
+  const max = Math.max(1, ...data.map((d) => d.value))
+  return (
+    <div className="flex h-44 items-end gap-2">
+      {data.map((d) => (
+        <div key={d.label} className="flex flex-1 flex-col items-center gap-2">
+          <p className="font-num text-[11px] font-bold text-charcoal/50">{valueFmt ? valueFmt(d.value) : d.value}</p>
+          <div className="relative flex w-full items-end rounded-md bg-mint" style={{ height: '110px' }}>
+            <div className="w-full rounded-md bg-emerald" style={{ height: `${(d.value / max) * 100}%` }} />
+          </div>
+          <p className="text-[11.5px] font-bold text-charcoal/55">{d.label}</p>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function AdminAnalyticsPage() {
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [dailyRides, setDailyRides] = useState([])
-  const [dailyRevenue, setDailyRevenue] = useState([])
+  const [week, setWeek] = useState([])
   const [topRoutes, setTopRoutes] = useState([])
+  const [topDrivers, setTopDrivers] = useState([])
   const [typeSplit, setTypeSplit] = useState({ shared: 0, reserve: 0 })
+  const [onlineToday, setOnlineToday] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -36,84 +53,157 @@ export default function AdminAnalyticsPage() {
       const all = rides || []
 
       const days = lastNDays(7)
-      const rideCounts = days.map((day) => ({
-        day,
-        count: all.filter((r) => r.created_at?.slice(0, 10) === day).length,
+      const stamp = (r) => dhakaDay(r.completed_at || r.created_at)
+
+      const { data: charges } = await supabase.from('driver_day_charges').select('day, driver_id, charge').gte('day', days[0])
+
+      setWeek(days.map((day) => {
+        const dayRides = all.filter((r) => stamp(r) === day)
+        return {
+          day,
+          count: dayRides.length,
+          fares: dayRides.reduce((s, r) => s + (r.fare || 0), 0),
+          income: (charges || []).filter((c) => c.day === day).reduce((s, c) => s + (c.charge || 0), 0),
+        }
       }))
-      const revenueByDay = days.map((day) => ({
-        day,
-        total: all.filter((r) => r.created_at?.slice(0, 10) === day).reduce((s, r) => s + (r.fare || 0), 0),
-      }))
-      setDailyRides(rideCounts)
-      setDailyRevenue(revenueByDay)
+      setOnlineToday((charges || []).filter((c) => c.day === days[days.length - 1]).length)
 
       const routeCounts = {}
       all.forEach((r) => {
         const key = `${r.pickup} → ${r.destination}`
         routeCounts[key] = (routeCounts[key] || 0) + 1
       })
-      const sortedRoutes = Object.entries(routeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
-      setTopRoutes(sortedRoutes)
+      setTopRoutes(Object.entries(routeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4))
 
-      const sharedCount = all.filter((r) => r.ride_type !== 'reserve').length
-      const reserveCount = all.filter((r) => r.ride_type === 'reserve').length
-      setTypeSplit({ shared: sharedCount, reserve: reserveCount })
+      setTypeSplit({
+        shared: all.filter((r) => r.ride_type !== 'reserve').length,
+        reserve: all.filter((r) => r.ride_type === 'reserve').length,
+      })
+
+      const byDriver = {}
+      all.forEach((r) => {
+        if (!r.driver_id) return
+        const e = (byDriver[r.driver_id] = byDriver[r.driver_id] || { trips: 0, earnings: 0 })
+        e.trips += 1
+        e.earnings += r.fare || 0
+      })
+      const top = Object.entries(byDriver).sort((a, b) => b[1].earnings - a[1].earnings).slice(0, 5)
+      const { data: people } = top.length
+        ? await supabase.from('profiles').select('user_id, name').in('user_id', top.map(([id]) => id))
+        : { data: [] }
+      const nameMap = {}
+      ;(people || []).forEach((p) => { nameMap[p.user_id] = p.name })
+      setTopDrivers(top.map(([id, v]) => ({ id, name: nameMap[id] || 'Driver', ...v })))
 
       setLoading(false)
     }
     load()
   }, [])
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 80 }}>Loading...</p>
+  if (loading) return <p className="mt-16 text-center text-charcoal/60">Loading...</p>
   if (!authorized) return null
 
-  const maxRides = Math.max(1, ...dailyRides.map((d) => d.count))
-  const maxRevenue = Math.max(1, ...dailyRevenue.map((d) => d.total))
-  const totalTyped = typeSplit.shared + typeSplit.reserve || 1
+  const ridesWeek = week.reduce((s, d) => s + d.count, 0)
+  const faresWeek = week.reduce((s, d) => s + d.fares, 0)
+  const incomeWeek = week.reduce((s, d) => s + d.income, 0)
+  const total = typeSplit.shared + typeSplit.reserve
+  const sharedPct = total ? (typeSplit.shared / total) * 100 : 0
+  const reservePct = total ? (typeSplit.reserve / total) * 100 : 0
 
   return (
-    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif', padding: '0 16px' }}>
-      <Link href="/admin">← Back to Dashboard</Link>
-      <h1>Analytics</h1>
+    <div className="space-y-5">
+      <p className="max-w-3xl text-[13px] text-charcoal/55">
+        Days follow Bangladesh time. &quot;Fares paid&quot; is what passengers paid drivers. &quot;Platform income&quot; is what
+        drivers owe you (daily fees plus commission) and appears from the day a driver first goes online under the new system.
+      </p>
 
-      <h3>Completed Rides — Last 7 Days</h3>
-      <div style={{ marginBottom: 24 }}>
-        {dailyRides.map((d) => (
-          <div key={d.day} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ width: 90, fontSize: 12, color: '#888' }}>{d.day.slice(5)}</span>
-            <div style={{ flex: 1, background: '#eee', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ width: `${(d.count / maxRides) * 100}%`, background: '#0066cc', color: 'white', fontSize: 11, padding: '2px 6px', minWidth: d.count > 0 ? 18 : 0 }}>
-                {d.count > 0 ? d.count : ''}
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <KpiCard icon={<IconCar size={16} />} label="Rides, last 7 days" value={ridesWeek} />
+        <KpiCard icon={<IconWallet size={16} />} label="Fares paid, last 7 days" value={`৳${faresWeek}`} />
+        <KpiCard icon={<IconTrendingUp size={16} />} label="Platform income, last 7 days" value={`৳${incomeWeek}`} tone="emerald" />
+        <KpiCard icon={<IconAutoRickshaw size={16} />} label="Drivers online today" value={onlineToday} />
       </div>
 
-      <h3>Revenue (৳) — Last 7 Days</h3>
-      <div style={{ marginBottom: 24 }}>
-        {dailyRevenue.map((d) => (
-          <div key={d.day} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ width: 90, fontSize: 12, color: '#888' }}>{d.day.slice(5)}</span>
-            <div style={{ flex: 1, background: '#eee', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ width: `${(d.total / maxRevenue) * 100}%`, background: '#2e7d32', color: 'white', fontSize: 11, padding: '2px 6px', minWidth: d.total > 0 ? 18 : 0 }}>
-                {d.total > 0 ? `৳${d.total}` : ''}
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <Panel title="Completed rides, last 7 days">
+          <BarChart data={week.map((d) => ({ label: d.day.slice(5), value: d.count }))} />
+        </Panel>
+        <Panel title="Fares paid (৳), last 7 days">
+          <BarChart data={week.map((d) => ({ label: d.day.slice(5), value: d.fares }))} valueFmt={(v) => `৳${v}`} />
+        </Panel>
+        <Panel title="Platform income (৳), last 7 days">
+          <BarChart data={week.map((d) => ({ label: d.day.slice(5), value: d.income }))} valueFmt={(v) => `৳${v}`} />
+        </Panel>
       </div>
 
-      <h3>Top Routes</h3>
-      {topRoutes.length === 0 && <p style={{ color: '#888' }}>No completed rides yet.</p>}
-      <ol style={{ paddingLeft: 20 }}>
-        {topRoutes.map(([route, count]) => (
-          <li key={route} style={{ marginBottom: 4 }}>{route} — {count} trip{count !== 1 ? 's' : ''}</li>
-        ))}
-      </ol>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Panel title="Ride type (all completed rides)">
+          {total === 0 ? (
+            <EmptyState icon={<IconCar size={28} />} text="No completed rides yet." />
+          ) : (
+            <div className="flex items-center gap-6">
+              <svg viewBox="0 0 42 42" className="h-32 w-32 shrink-0">
+                <circle cx="21" cy="21" r="15.9" fill="transparent" stroke="#E6F4EA" strokeWidth="6" />
+                <circle
+                  cx="21" cy="21" r="15.9" fill="transparent" stroke="#00875A" strokeWidth="6"
+                  strokeDasharray={`${sharedPct} ${100 - sharedPct}`} strokeDashoffset="25"
+                />
+                <circle
+                  cx="21" cy="21" r="15.9" fill="transparent" stroke="#F59E0B" strokeWidth="6"
+                  strokeDasharray={`${reservePct} ${100 - reservePct}`} strokeDashoffset={`${25 - sharedPct}`}
+                />
+              </svg>
+              <div className="space-y-2.5">
+                <p className="flex items-center gap-2 text-[13.5px] font-semibold text-charcoal">
+                  <span className="inline-block h-3 w-3 rounded-full bg-emerald" />
+                  Shared: {typeSplit.shared} ({Math.round(sharedPct)}%)
+                </p>
+                <p className="flex items-center gap-2 text-[13.5px] font-semibold text-charcoal">
+                  <span className="inline-block h-3 w-3 rounded-full bg-amber" />
+                  Reserve: {typeSplit.reserve} ({Math.round(reservePct)}%)
+                </p>
+              </div>
+            </div>
+          )}
+        </Panel>
 
-      <h3>Ride Type Split</h3>
-      <p>Shared: {typeSplit.shared} ({Math.round((typeSplit.shared / totalTyped) * 100)}%) · Reserve: {typeSplit.reserve} ({Math.round((typeSplit.reserve / totalTyped) * 100)}%)</p>
+        <Panel title="Top 5 drivers (by fares earned)">
+          {topDrivers.length === 0 ? (
+            <EmptyState icon={<IconAutoRickshaw size={28} />} text="No completed rides yet." />
+          ) : (
+            <div className="space-y-2.5">
+              {topDrivers.map((d, i) => (
+                <div key={d.id} className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mint font-num text-[12.5px] font-bold text-emerald-dark">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-[13.5px] font-bold text-charcoal">{d.name}</p>
+                    <p className="text-[11.5px] font-semibold text-charcoal/45">{d.trips} {d.trips === 1 ? 'trip' : 'trips'}</p>
+                  </div>
+                  <p className="font-num text-[14px] font-extrabold text-emerald-dark">৳{d.earnings}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <Panel title="Busiest routes (all completed rides)">
+        {topRoutes.length === 0 ? (
+          <EmptyState icon={<IconMapPin size={28} />} text="No completed rides yet." />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {topRoutes.map(([route, count]) => (
+              <div key={route} className="rounded-xl bg-offwhite p-3.5">
+                <p className="mb-1 text-[13px] font-bold text-charcoal">{route}</p>
+                <p className="font-num text-[18px] font-extrabold text-emerald-dark">{count}</p>
+                <p className="text-[11px] font-semibold text-charcoal/45">{count === 1 ? 'trip' : 'trips'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
     </div>
   )
 }
