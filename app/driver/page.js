@@ -111,6 +111,7 @@ export default function DriverPage() {
   const [queueStatus, setQueueStatus] = useState([])
   const myTripChannelRef = useRef(null)
   const profileChannelRef = useRef(null)
+  const routeChannelRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
@@ -131,6 +132,13 @@ export default function DriverPage() {
 
       const { data: routeRows } = await supabase.from('routes').select('*').order('id')
       setRoutes(routeRows || [])
+      routeChannelRef.current = supabase
+        .channel('route-list-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'routes' }, async () => {
+          const { data } = await supabase.from('routes').select('*').order('id')
+          setRoutes(data || [])
+        })
+        .subscribe()
 
       const { data: openTrip } = await supabase.from('trips').select('*')
         .eq('driver_id', user.id).in('status', ['open', 'in_progress'])
@@ -168,6 +176,7 @@ export default function DriverPage() {
       if (queueChannelRef.current) supabase.removeChannel(queueChannelRef.current)
       if (myTripChannelRef.current) supabase.removeChannel(myTripChannelRef.current)
       if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current)
+      if (routeChannelRef.current) supabase.removeChannel(routeChannelRef.current)
     }
   }, [])
 

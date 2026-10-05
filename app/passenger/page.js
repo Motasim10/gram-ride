@@ -113,6 +113,7 @@ export default function PassengerPage() {
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
+  const routeChannelRef = useRef(null)
   const profileChannelRef = useRef(null)
   const { t } = useLanguage()
 
@@ -123,6 +124,19 @@ export default function PassengerPage() {
   const dropOptions = pickupStop ? routeStops.filter((s) => s.position > pickupStop.position) : []
   const farePerSeat = routeId && pickupStopId && dropStopId ? routeFares[`${routeId}|${pickupStopId}|${dropStopId}`] : null
   const fixedFare = farePerSeat ? farePerSeat * seats : null
+
+  const loadRoutes = async () => {
+    const { data: routeRows } = await supabase.from('routes').select('*').order('id')
+    const { data: stopRows } = await supabase.from('route_stops').select('*').order('position')
+    const { data: fareRows } = await supabase.from('route_fares').select('*')
+    const stops = {}
+    ;(stopRows || []).forEach((s) => { (stops[s.route_id] = stops[s.route_id] || []).push(s) })
+    const fareLookup = {}
+    ;(fareRows || []).forEach((f) => { fareLookup[`${f.route_id}|${f.from_stop_id}|${f.to_stop_id}`] = f.fare_per_seat })
+    setRoutes(routeRows || [])
+    setStopsByRoute(stops)
+    setRouteFares(fareLookup)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -141,16 +155,13 @@ export default function PassengerPage() {
         .subscribe()
       profileChannelRef.current = profileChannel
 
-      const { data: routeRows } = await supabase.from('routes').select('*').order('id')
-      const { data: stopRows } = await supabase.from('route_stops').select('*').order('position')
-      const { data: fareRows } = await supabase.from('route_fares').select('*')
-      const stops = {}
-      ;(stopRows || []).forEach((s) => { (stops[s.route_id] = stops[s.route_id] || []).push(s) })
-      const fareLookup = {}
-      ;(fareRows || []).forEach((f) => { fareLookup[`${f.route_id}|${f.from_stop_id}|${f.to_stop_id}`] = f.fare_per_seat })
-      setRoutes(routeRows || [])
-      setStopsByRoute(stops)
-      setRouteFares(fareLookup)
+      await loadRoutes()
+      routeChannelRef.current = supabase
+        .channel('route-changes-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'route_fares' }, () => loadRoutes())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'route_stops' }, () => loadRoutes())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'routes' }, () => loadRoutes())
+        .subscribe()
 
       await checkActiveRide(user.id)
       subscribeToRideChanges(user.id)
@@ -160,6 +171,7 @@ export default function PassengerPage() {
       if (rideChannelRef.current) supabase.removeChannel(rideChannelRef.current)
       if (profileChannelRef.current) supabase.removeChannel(profileChannelRef.current)
       if (bidsChannelRef.current) supabase.removeChannel(bidsChannelRef.current)
+      if (routeChannelRef.current) supabase.removeChannel(routeChannelRef.current)
     }
   }, [])
 
@@ -167,6 +179,7 @@ export default function PassengerPage() {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && userId) {
         checkActiveRide(userId)
+        loadRoutes()
         supabase.from('profiles').select('flagged').eq('user_id', userId).single()
           .then(({ data }) => setIsFlagged(data?.flagged || false))
       }
