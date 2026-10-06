@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { Tabs, SearchBox, Panel, StatusBadge } from '@/components/admin/AdminUI'
+import ResetPinButton from '@/components/admin/ResetPinButton'
 
 export default function AdminPassengersPage() {
   const [authorized, setAuthorized] = useState(false)
@@ -96,12 +97,15 @@ export default function AdminPassengersPage() {
                     <StatusBadge tone={p.flagged ? 'red' : 'emerald'}>{p.flagged ? 'Flagged' : 'Active'}</StatusBadge>
                   </td>
                   <td className="px-5 py-3">
-                    <button
-                      onClick={() => toggleFlag(p)}
-                      className={`text-[12.5px] font-bold ${p.flagged ? 'text-emerald' : 'text-danger'}`}
-                    >
-                      {p.flagged ? 'Unflag' : 'Flag'}
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => toggleFlag(p)}
+                        className={`text-[12.5px] font-bold ${p.flagged ? 'text-emerald' : 'text-danger'}`}
+                      >
+                        {p.flagged ? 'Unflag' : 'Flag'}
+                      </button>
+                      <ResetPinButton userId={p.user_id} name={p.name} />
+                    </div>
                   </td>
                 </tr>
               ))}
