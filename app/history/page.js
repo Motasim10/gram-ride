@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
+import { IconClock } from '@/components/ui/Icons'
 
 const chipClass = 'inline-flex items-center rounded-full border border-line-soft bg-offwhite px-2.5 py-1 text-[12px] font-bold text-charcoal/70'
 
@@ -55,7 +56,7 @@ export default function HistoryPage() {
 
       {trips.length === 0 && (
         <SectionCard className="py-10 text-center">
-          <p className="mb-2 text-4xl">🕘</p>
+          <IconClock size={40} className="mx-auto mb-2 text-charcoal/30" />
           <p className="text-[14px] text-charcoal/50">{t('noCompletedTrips')}</p>
         </SectionCard>
       )}

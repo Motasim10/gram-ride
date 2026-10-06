@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
+import { IconBell } from '@/components/ui/Icons'
 
 export default function NotificationsPage() {
   const { t, tn } = useLanguage()
@@ -42,7 +43,7 @@ export default function NotificationsPage() {
 
       {items.length === 0 && (
         <SectionCard className="py-10 text-center">
-          <p className="mb-2 text-4xl">🔔</p>
+          <IconBell size={40} className="mx-auto mb-2 text-charcoal/30" />
           <p className="text-[14px] text-charcoal/50">{t('noNotificationsYet')}</p>
         </SectionCard>
       )}

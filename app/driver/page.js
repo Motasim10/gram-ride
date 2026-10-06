@@ -8,6 +8,7 @@ import NotificationBell from '@/lib/NotificationBell'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
+import { IconCar, IconAutoRickshaw } from '@/components/ui/Icons'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
@@ -551,14 +552,14 @@ export default function DriverPage() {
           <div>
             <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('vehicle')}</p>
             <div className="grid grid-cols-2 gap-3">
-              {[['cng', '🚕', t('cng5')], ['auto', '🛺', t('auto2')]].map(([v, icon, label]) => (
+              {[['cng', IconCar, t('cng5')], ['auto', IconAutoRickshaw, t('auto2')]].map(([v, Icon, label]) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setVehicleType(v)}
                   className={`tap-target flex flex-col items-center gap-1 rounded-xl border-2 py-3 text-[13px] font-bold ${vehicleType === v ? 'border-emerald bg-mint text-emerald' : 'border-line bg-white text-charcoal/70'}`}
                 >
-                  <span className="text-2xl">{icon}</span>
+                  <Icon size={28} />
                   {label}
                 </button>
               ))}

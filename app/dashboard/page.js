@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n'
 import NotificationBell from '@/lib/NotificationBell'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
+import { IconClock, IconWallet, IconMessageSquare, IconHelpCircle, IconUser, IconCar, IconNavigation } from '@/components/ui/Icons'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
@@ -30,10 +31,10 @@ export default function Dashboard() {
 
   const isDriver = profile.role === 'driver'
   const tiles = [
-    { href: '/history', icon: '🕘', label: t('tripHistory') },
-    ...(isDriver ? [{ href: '/wallet', icon: '💰', label: t('walletStats') }] : []),
-    { href: '/complaints', icon: '📝', label: t('complaints') },
-    { href: '/help', icon: '💬', label: t('helpSupport') },
+    { href: '/history', Icon: IconClock, label: t('tripHistory') },
+    ...(isDriver ? [{ href: '/wallet', Icon: IconWallet, label: t('walletStats') }] : []),
+    { href: '/complaints', Icon: IconMessageSquare, label: t('complaints') },
+    { href: '/help', Icon: IconHelpCircle, label: t('helpSupport') },
   ]
 
   return (
@@ -48,9 +49,15 @@ export default function Dashboard() {
             <p className="text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <NotificationBell />
-          <Link href="/profile" className="text-2xl" aria-label={t('profile')}>👤</Link>
+          <Link
+            href="/profile"
+            aria-label={t('profile')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-mint text-emerald"
+          >
+            <IconUser size={20} />
+          </Link>
         </div>
       </div>
 
@@ -60,16 +67,17 @@ export default function Dashboard() {
 
       <Link
         href={isDriver ? '/driver' : '/passenger'}
-        className="rise-in mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald py-5 text-[17px] font-bold text-white active:bg-emerald-dark"
+        className="rise-in mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl bg-emerald py-5 text-[17px] font-bold text-white active:bg-emerald-dark"
       >
-        🚗 {isDriver ? t('viewRequests') : t('requestRide')}
+        {isDriver ? <IconNavigation size={22} /> : <IconCar size={22} />}
+        {isDriver ? t('viewRequests') : t('requestRide')}
       </Link>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         {tiles.map((tile) => (
           <Link key={tile.href} href={tile.href}>
             <SectionCard className="flex h-28 flex-col items-center justify-center gap-2 text-center active:bg-mint">
-              <span className="text-3xl">{tile.icon}</span>
+              <tile.Icon size={30} className="text-emerald" />
               <span className="text-[14px] font-bold text-charcoal">{tile.label}</span>
             </SectionCard>
           </Link>

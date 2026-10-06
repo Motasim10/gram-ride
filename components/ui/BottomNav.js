@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { useLanguage } from '@/lib/i18n'
+import { IconHome, IconCar, IconNavigation, IconClock, IconWallet, IconHelpCircle, IconUser } from '@/components/ui/Icons'
 
 const SHOW_ON = ['/dashboard', '/passenger', '/driver', '/history', '/wallet', '/profile', '/notifications', '/help', '/complaints']
 
@@ -29,18 +30,18 @@ export default function BottomNav() {
 
   const tabs = role === 'driver'
     ? [
-        { href: '/dashboard', icon: '🏠', label: t('navHome') },
-        { href: '/driver', icon: '🚕', label: t('navDrive') },
-        { href: '/wallet', icon: '💰', label: t('navWallet') },
-        { href: '/help', icon: '💬', label: t('navHelp') },
-        { href: '/profile', icon: '👤', label: t('profile') },
+        { href: '/dashboard', Icon: IconHome, label: t('navHome') },
+        { href: '/driver', Icon: IconNavigation, label: t('navDrive') },
+        { href: '/wallet', Icon: IconWallet, label: t('navWallet') },
+        { href: '/help', Icon: IconHelpCircle, label: t('navHelp') },
+        { href: '/profile', Icon: IconUser, label: t('profile') },
       ]
     : [
-        { href: '/dashboard', icon: '🏠', label: t('navHome') },
-        { href: '/passenger', icon: '🚗', label: t('navRide') },
-        { href: '/history', icon: '🕘', label: t('navHistory') },
-        { href: '/help', icon: '💬', label: t('navHelp') },
-        { href: '/profile', icon: '👤', label: t('profile') },
+        { href: '/dashboard', Icon: IconHome, label: t('navHome') },
+        { href: '/passenger', Icon: IconCar, label: t('navRide') },
+        { href: '/history', Icon: IconClock, label: t('navHistory') },
+        { href: '/help', Icon: IconHelpCircle, label: t('navHelp') },
+        { href: '/profile', Icon: IconUser, label: t('profile') },
       ]
 
   return (
@@ -57,7 +58,9 @@ export default function BottomNav() {
                   aria-current={active ? 'page' : undefined}
                   className={`flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-bold ${active ? 'text-emerald' : 'text-charcoal/50'}`}
                 >
-                  <span className={`flex h-8 w-12 items-center justify-center rounded-full text-xl ${active ? 'bg-mint' : ''}`}>{tab.icon}</span>
+                  <span className={`flex h-8 w-12 items-center justify-center rounded-full ${active ? 'bg-mint' : ''}`}>
+                    <tab.Icon size={22} />
+                  </span>
                   {tab.label}
                 </Link>
               </li>

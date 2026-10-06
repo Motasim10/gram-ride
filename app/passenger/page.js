@@ -8,6 +8,7 @@ import NotificationBell from '@/lib/NotificationBell'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
+import { IconCar, IconAutoRickshaw, IconPhoneCall } from '@/components/ui/Icons'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const formatLeft = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
@@ -601,7 +602,7 @@ export default function PassengerPage() {
                 href={`tel:${driverProfile.phone}`}
                 className="tap-target mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald text-[16px] font-bold text-white active:bg-emerald-dark"
               >
-                📞 {t('callDriver')}
+                <IconPhoneCall size={20} /> {t('callDriver')}
               </a>
             ) : (
               <p className="mt-3 text-[12px] text-charcoal/50">{t('noPhoneAvailable')}</p>
@@ -800,14 +801,14 @@ export default function PassengerPage() {
           <div>
             <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('vehicle')}</p>
             <div className="grid grid-cols-2 gap-3">
-              {[['cng', '🚕', t('cng5')], ['auto', '🛺', t('auto2')]].map(([v, icon, label]) => (
+              {[['cng', IconCar, t('cng5')], ['auto', IconAutoRickshaw, t('auto2')]].map(([v, Icon, label]) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => handleSelectVehicle(v)}
                   className={`tap-target flex flex-col items-center gap-1 rounded-xl border-2 py-3 text-[13px] font-bold ${vehicleType === v ? 'border-emerald bg-mint text-emerald' : 'border-line bg-white text-charcoal/70'}`}
                 >
-                  <span className="text-2xl">{icon}</span>
+                  <Icon size={28} />
                   {label}
                 </button>
               ))}
