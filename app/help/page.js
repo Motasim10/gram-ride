@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
+import { HOTLINE_NUMBER } from '@/lib/config'
 import { IconPhoneCall } from '@/components/ui/Icons'
 
-const HOTLINE_NUMBER = '01700-000000' // TODO: replace with your real support number
 
 export default function HelpPage() {
   const [openIndex, setOpenIndex] = useState(null)
@@ -29,7 +29,7 @@ export default function HelpPage() {
           href={`tel:${HOTLINE_NUMBER}`}
           className="tap-target flex w-full items-center justify-center gap-2 rounded-2xl bg-white font-num text-[18px] font-extrabold text-emerald active:bg-mint"
         >
-          <IconPhoneCall size={20} /> {t('hotlineNumber')}
+          <IconPhoneCall size={20} /> {HOTLINE_NUMBER}
         </a>
       </div>
 

@@ -119,6 +119,7 @@ export default function ProfilePage() {
       </SectionCard>
 
       <div className="space-y-3">
+        <PrimaryButton tone="outline" onClick={() => router.push('/change-pin')}>{t('changePinTitle')}</PrimaryButton>
         <PrimaryButton tone="outline" onClick={handleSwitchRole}>
           {profile.role === 'passenger' ? t('switchToDriver') : t('switchToPassenger')}
         </PrimaryButton>

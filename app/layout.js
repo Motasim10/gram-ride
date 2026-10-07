@@ -3,6 +3,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import LanguageToggle from "@/lib/LanguageToggle";
 import BottomNav from "@/components/ui/BottomNav";
+import PinGate from "@/components/PinGate";
 
 const hind = Hind_Siliguri({
   variable: "--font-hind",
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
           <LanguageToggle />
           {children}
           <BottomNav />
+          <PinGate />
         </LanguageProvider>
       </body>
     </html>

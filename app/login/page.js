@@ -7,6 +7,8 @@ import { useLanguage } from '@/lib/i18n'
 import { phoneToEmail, normalizePin } from '@/lib/phoneAuth'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
+import { IconPhoneCall } from '@/components/ui/Icons'
+import { HOTLINE_NUMBER } from '@/lib/config'
 
 export default function Login() {
   const [identifier, setIdentifier] = useState('')
@@ -73,6 +75,18 @@ export default function Login() {
         {t('noAccountYet')}{' '}
         <Link href="/signup" className="font-bold text-emerald">{t('createAccountButton')}</Link>
       </p>
+
+      <div className="mt-6 rounded-2xl border-2 border-line-soft bg-white p-4 text-center">
+        <p className="text-[13.5px] font-bold text-charcoal">{t('forgotPin')}</p>
+        <p className="mt-1 text-[13px] text-charcoal/60">{t('forgotPinHelp')}</p>
+        <a
+          href={`tel:${HOTLINE_NUMBER}`}
+          className="mt-2 inline-flex items-center gap-2 font-num text-[16px] font-extrabold text-emerald"
+        >
+          <IconPhoneCall size={18} />
+          {HOTLINE_NUMBER}
+        </a>
+      </div>
     </Screen>
   )
 }
