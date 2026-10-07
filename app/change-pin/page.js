@@ -13,6 +13,7 @@ const inputClass =
 
 export default function ChangePinPage() {
   const [forced, setForced] = useState(false)
+  const [email, setEmail] = useState('')
   const [ready, setReady] = useState(false)
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
@@ -27,6 +28,7 @@ export default function ChangePinPage() {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
+      setEmail(user.email || '')
       const { data } = await supabase.from('profiles').select('must_change_pin').eq('user_id', user.id).single()
       setForced(!!data?.must_change_pin)
       setReady(true)
@@ -66,6 +68,12 @@ export default function ChangePinPage() {
     } catch {
       setError('Could not reach the server.')
       setLoading(false)
+      return
+    }
+    // The server may end the old session when the PIN changes, so sign in again with the new PIN.
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: next })
+    if (signInError) {
+      router.replace('/login')
       return
     }
     setDone(true)
