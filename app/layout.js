@@ -1,7 +1,6 @@
 import { Hind_Siliguri, Manrope } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
-import LanguageToggle from "@/lib/LanguageToggle";
 import BottomNav from "@/components/ui/BottomNav";
 import PinGate from "@/components/PinGate";
 
@@ -27,7 +26,6 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${hind.variable} ${manrope.variable} antialiased`}>
         <LanguageProvider>
-          <LanguageToggle />
           {children}
           <BottomNav />
           <PinGate />

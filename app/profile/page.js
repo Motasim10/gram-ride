@@ -15,7 +15,7 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
   const [editing, setEditing] = useState(false)
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, lang, toggleLang } = useLanguage()
 
   useEffect(() => {
     const load = async () => {
@@ -116,6 +116,22 @@ export default function ProfilePage() {
             {saved && <p className="mt-1 text-[13px] font-semibold text-emerald">✓ {t('changesSaved')}</p>}
           </div>
         )}
+      </SectionCard>
+
+      <SectionCard className="mb-4">
+        <p className="mb-3 text-[13px] font-semibold text-charcoal/60">{t('languageLabel')}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[['bn', 'বাংলা'], ['en', 'English']].map(([code, label]) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => { if (lang !== code) toggleLang() }}
+              className={`tap-target rounded-xl border-2 text-[14px] font-bold ${lang === code ? 'border-emerald bg-emerald text-white' : 'border-line bg-white text-charcoal/70'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </SectionCard>
 
       <div className="space-y-3">
