@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n'
-import NotificationBell from '@/lib/NotificationBell'
+import HeaderActions from '@/components/ui/HeaderActions'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
-import { IconClock, IconWallet, IconMessageSquare, IconHelpCircle, IconUser, IconCar, IconNavigation } from '@/components/ui/Icons'
+import { IconClock, IconWallet, IconMessageSquare, IconHelpCircle, IconCar, IconNavigation } from '@/components/ui/Icons'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
@@ -40,25 +40,16 @@ export default function Dashboard() {
   return (
     <Screen>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-mint text-xl font-bold text-emerald">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mint text-xl font-bold text-emerald">
             {(profile.name || '?').trim().charAt(0).toUpperCase()}
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[13px] text-charcoal/60">{t('welcome')}</p>
-            <p className="text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
+            <p className="truncate text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <NotificationBell />
-          <Link
-            href="/profile"
-            aria-label={t('profile')}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-mint text-emerald"
-          >
-            <IconUser size={20} />
-          </Link>
-        </div>
+        <HeaderActions profile />
       </div>
 
       <span className="mt-3 inline-block rounded-full bg-mint px-3 py-1 text-[12px] font-bold text-emerald">

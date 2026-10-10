@@ -8,6 +8,8 @@ import NotificationBell from '@/lib/NotificationBell'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
+import HeaderActions from '@/components/ui/HeaderActions'
+import FloatingSos from '@/components/ui/FloatingSos'
 import { IconCar, IconAutoRickshaw, IconPhoneCall } from '@/components/ui/Icons'
 
 const CAPACITY = { cng: 5, auto: 2 }
@@ -509,19 +511,10 @@ export default function PassengerPage() {
     return (
       <Screen>
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-[22px] font-bold text-charcoal">{t('trackingTitle')}</h1>
-            <NotificationBell />
-          </div>
-          {sosAllowed && !showSosConfirm && !sosSent && (
-            <button
-              onClick={() => setShowSosConfirm(true)}
-              className="flex h-8 items-center rounded-full bg-danger px-3 text-[12px] font-extrabold tracking-wide text-white active:bg-danger-dark"
-            >
-              {t('sos')}
-            </button>
-          )}
+          <h1 className="text-[22px] font-bold text-charcoal">{t('trackingTitle')}</h1>
+          <HeaderActions />
         </div>
+        {sosAllowed && !showSosConfirm && !sosSent && <FloatingSos onPress={() => setShowSosConfirm(true)} />}
 
         {showSosConfirm && (
           <div className="mb-4 rounded-2xl border-2 border-danger bg-danger/5 p-4">
@@ -724,7 +717,7 @@ export default function PassengerPage() {
     <Screen>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-[22px] font-bold text-charcoal">{t('requestRideTitle')}</h1>
-        <NotificationBell />
+        <HeaderActions />
       </div>
 
       {isFlagged && (

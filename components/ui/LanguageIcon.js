@@ -11,7 +11,7 @@ export default function LanguageIcon() {
     <button
       onClick={toggleLang}
       aria-label={lang === 'bn' ? 'Switch to English' : 'বাংলায় পরিবর্তন করুন'}
-      className="flex h-10 items-center gap-1 rounded-full bg-mint px-3 text-[12px] font-extrabold text-emerald active:bg-emerald active:text-white"
+      className="flex h-10 items-center gap-1.5 rounded-full bg-emerald px-3.5 text-[12.5px] font-extrabold text-white active:bg-emerald-dark"
     >
       <IconGlobe size={16} />
       {lang === 'bn' ? 'EN' : 'বাং'}

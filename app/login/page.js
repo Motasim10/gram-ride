@@ -76,17 +76,9 @@ export default function Login() {
         <Link href="/signup" className="font-bold text-emerald">{t('createAccountButton')}</Link>
       </p>
 
-      <div className="mt-6 rounded-2xl border-2 border-line-soft bg-white p-4 text-center">
-        <p className="text-[13.5px] font-bold text-charcoal">{t('forgotPin')}</p>
-        <p className="mt-1 text-[13px] text-charcoal/60">{t('forgotPinHelp')}</p>
-        <a
-          href={`tel:${HOTLINE_NUMBER}`}
-          className="mt-2 inline-flex items-center gap-2 font-num text-[16px] font-extrabold text-emerald"
-        >
-          <IconPhoneCall size={18} />
-          {HOTLINE_NUMBER}
-        </a>
-      </div>
+      <a href="/forgot-pin" className="block pt-3 text-center text-sm font-semibold text-emerald-700 underline">
+        {t('forgotPin')}
+      </a>
     </Screen>
   )
 }

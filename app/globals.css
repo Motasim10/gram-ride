@@ -43,6 +43,6 @@ body { color: #111827; font-family: var(--font-hind), sans-serif; }
   .live-dot, .rise-in { animation: none; }
 }
 
-.screen-root > :nth-child(2):not(.text-center):not(.mx-auto) {
+.has-corner > :nth-child(2):not(.text-center):not(.mx-auto) {
   padding-right: 4.75rem;
 }

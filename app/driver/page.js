@@ -8,6 +8,7 @@ import NotificationBell from '@/lib/NotificationBell'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
+import HeaderActions from '@/components/ui/HeaderActions'
 import { IconCar, IconAutoRickshaw } from '@/components/ui/Icons'
 
 const CAPACITY = { cng: 5, auto: 2 }
@@ -527,7 +528,7 @@ export default function DriverPage() {
     <Screen>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-[22px] font-bold text-charcoal">{t('rideRequestsTitle')}</h1>
-        <NotificationBell />
+        <HeaderActions />
       </div>
 
       {isFlagged && (
