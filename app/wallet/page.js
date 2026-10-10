@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
+import { money, num, formatDate } from '@/lib/names'
 
 const todayDhaka = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
 
 export default function WalletPage() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [totalEarnings, setTotalEarnings] = useState(0)
   const [totalTrips, setTotalTrips] = useState(0)
@@ -73,7 +74,7 @@ export default function WalletPage() {
       {balance && (
         <div className={`mb-4 rounded-2xl border-2 p-5 ${blocked ? 'border-danger bg-danger/5' : balance.outstanding > 0 ? 'border-amber/60 bg-amber/10' : 'border-emerald/40 bg-mint'}`}>
           <p className="text-[13px] font-semibold text-charcoal/60">{t('balanceTitle')}</p>
-          <p className={`font-num text-[36px] font-extrabold leading-tight ${blocked ? 'text-danger' : 'text-charcoal'}`}>৳{Math.max(0, balance.outstanding)}</p>
+          <p className={`font-num text-[36px] font-extrabold leading-tight ${blocked ? 'text-danger' : 'text-charcoal'}`}>{money(Math.max(0, balance.outstanding), lang)}</p>
           <p className="mt-1 text-[13px] font-semibold text-charcoal/70">
             {blocked ? t('blockedNote') : balance.outstanding > 0 ? t('payBalanceNote') : `✓ ${t('allPaid')}`}
           </p>
@@ -84,10 +85,10 @@ export default function WalletPage() {
         <p className="text-[13px] font-semibold text-charcoal/60">{t('todayTitle')}</p>
         {todayRow ? (
           todayRow.model === 'daily_fee' ? (
-            <p className="mt-1 font-bold text-charcoal">{t('todayFee')}: <span className="font-num">৳{todayRow.charge}</span></p>
+            <p className="mt-1 font-bold text-charcoal">{t('todayFee')}: <span className="font-num">{money(todayRow.charge, lang)}</span></p>
           ) : (
             <p className="mt-1 font-bold text-charcoal">
-              {t('todayCommission')}: <span className="font-num">{todayRow.commission_rate}% × ৳{todayRow.earnings} = ৳{todayRow.charge}</span>
+              {t('todayCommission')}: <span className="font-num">{num(todayRow.commission_rate, lang)}% × {money(todayRow.earnings, lang)} = {money(todayRow.charge, lang)}</span>
             </p>
           )
         ) : (
@@ -97,22 +98,22 @@ export default function WalletPage() {
 
       <div className="mb-4 rounded-2xl bg-emerald p-5 text-white">
         <p className="text-[13px] font-semibold text-white/80">{t('totalEarnings')}</p>
-        <p className="font-num text-[40px] font-extrabold leading-tight">৳{totalEarnings}</p>
+        <p className="font-num text-[40px] font-extrabold leading-tight">{money(totalEarnings, lang)}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <SectionCard>
           <p className="text-[12.5px] font-semibold text-charcoal/60">{t('totalTrips')}</p>
-          <p className="font-num text-[28px] font-extrabold text-charcoal">{totalTrips}</p>
+          <p className="font-num text-[28px] font-extrabold text-charcoal">{num(totalTrips, lang)}</p>
         </SectionCard>
         <SectionCard>
           <p className="text-[12.5px] font-semibold text-charcoal/60">{t('rating')}</p>
           {avgRating ? (
             <>
               <p className="font-num text-[28px] font-extrabold text-charcoal">
-                <span className="text-amber">★</span> {avgRating}
+                <span className="text-amber">★</span> {num(avgRating, lang)}
               </p>
-              <p className="text-[11.5px] text-charcoal/50">({ratingCount} {t('ratingsCount')})</p>
+              <p className="text-[11.5px] text-charcoal/50">({num(ratingCount, lang)} {t('ratingsCount')})</p>
             </>
           ) : (
             <p className="mt-1 text-[15px] font-bold text-charcoal/50">{t('noRatingsYet')}</p>
@@ -127,12 +128,12 @@ export default function WalletPage() {
             {days.map((c) => (
               <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-line-soft bg-white px-3 py-2.5">
                 <div>
-                  <p className="font-num text-[13px] font-bold text-charcoal">{c.day}</p>
+                  <p className="font-num text-[13px] font-bold text-charcoal">{formatDate(c.day, lang)}</p>
                   <p className="text-[12px] text-charcoal/55">
-                    {c.model === 'daily_fee' ? t('dailyFeeTag') : `${t('commissionTag')} ${c.commission_rate}%`}
+                    {c.model === 'daily_fee' ? t('dailyFeeTag') : `${t('commissionTag')} ${num(c.commission_rate, lang)}%`}
                   </p>
                 </div>
-                <p className="font-num text-[16px] font-extrabold text-charcoal">৳{c.charge}</p>
+                <p className="font-num text-[16px] font-extrabold text-charcoal">{money(c.charge, lang)}</p>
               </div>
             ))}
           </div>
