@@ -20,6 +20,21 @@ function FareInput({ value, onCommit }) {
   )
 }
 
+function BnInput({ value, onCommit, placeholder, className = '' }) {
+  const [local, setLocal] = useState(value ?? '')
+  useEffect(() => { setLocal(value ?? '') }, [value])
+  return (
+    <input
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => { if (local.trim() !== (value ?? '').trim()) onCommit(local.trim()) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+      placeholder={placeholder}
+      className={`rounded-lg border-2 border-line-soft bg-white px-2.5 py-1.5 text-[13px] font-semibold text-charcoal focus:border-emerald focus:outline-none ${className}`}
+    />
+  )
+}
+
 export default function AdminRoutesPage() {
   const [authorized, setAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -27,7 +42,9 @@ export default function AdminRoutesPage() {
   const [stopsByRoute, setStopsByRoute] = useState({})
   const [faresByRoute, setFaresByRoute] = useState({})
   const [newRouteName, setNewRouteName] = useState('')
+  const [newRouteNameBn, setNewRouteNameBn] = useState('')
   const [newStopInputs, setNewStopInputs] = useState({})
+  const [newStopBnInputs, setNewStopBnInputs] = useState({})
   const [openRouteId, setOpenRouteId] = useState(null)
   const router = useRouter()
 
@@ -67,8 +84,9 @@ export default function AdminRoutesPage() {
   const addRoute = async () => {
     const name = newRouteName.trim()
     if (!name) return
-    const { data } = await supabase.from('routes').insert({ name }).select().single()
+    const { data } = await supabase.from('routes').insert({ name, name_bn: newRouteNameBn.trim() || null }).select().single()
     setNewRouteName('')
+    setNewRouteNameBn('')
     await loadAll()
     if (data) setOpenRouteId(data.id)
   }
@@ -85,14 +103,21 @@ export default function AdminRoutesPage() {
     if (!name) return
     const existing = stopsByRoute[routeId] || []
     const nextPos = existing.length > 0 ? Math.max(...existing.map((s) => s.position)) + 1 : 1
-    await supabase.from('route_stops').insert({ route_id: routeId, name, position: nextPos })
+    const nameBn = (newStopBnInputs[routeId] || '').trim()
+    await supabase.from('route_stops').insert({ route_id: routeId, name, name_bn: nameBn || null, position: nextPos })
     setNewStopInputs((prev) => ({ ...prev, [routeId]: '' }))
+    setNewStopBnInputs((prev) => ({ ...prev, [routeId]: '' }))
     await loadAll()
   }
 
   const deleteStop = async (stop) => {
     if (!window.confirm(`Delete stop "${stop.name}"? Any fares involving it will be removed.`)) return
     await supabase.from('route_stops').delete().eq('id', stop.id)
+    await loadAll()
+  }
+
+  const updateBnName = async (table, id, value) => {
+    await supabase.from(table).update({ name_bn: value || null }).eq('id', id)
     await loadAll()
   }
 
@@ -139,7 +164,13 @@ export default function AdminRoutesPage() {
           <input
             value={newRouteName}
             onChange={(e) => setNewRouteName(e.target.value)}
-            placeholder="New route name (e.g. Nanupur → Azadi Bazar)"
+            placeholder="New route name in English (e.g. Nanupur → Azadi Bazar)"
+            className={`${inputClass} min-w-[240px] flex-1`}
+          />
+          <input
+            value={newRouteNameBn}
+            onChange={(e) => setNewRouteNameBn(e.target.value)}
+            placeholder="বাংলায় রুটের নাম (যেমন: নানুপুর → আজাদী বাজার)"
             className={`${inputClass} min-w-[240px] flex-1`}
           />
           <button
@@ -167,7 +198,13 @@ export default function AdminRoutesPage() {
                   </div>
                   <div>
                     <p className="text-[15px] font-bold text-charcoal">{route.name}</p>
-                    <p className="text-[12px] font-semibold text-charcoal/45">{stops.length} stop{stops.length !== 1 ? 's' : ''}</p>
+                    {route.name_bn && <p className="text-[13.5px] font-semibold text-emerald">{route.name_bn}</p>}
+                    <p className="text-[12px] font-semibold text-charcoal/45">
+                      {stops.length} stop{stops.length !== 1 ? 's' : ''}
+                      {(!route.name_bn || stops.some((s) => !s.name_bn)) && (
+                        <span className="ml-2 text-amber-dark">⚠ Bangla name missing</span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -189,7 +226,16 @@ export default function AdminRoutesPage() {
               {isOpen && (
                 <div className="space-y-6 border-t-2 border-line-soft px-5 py-5">
                   <div>
-                    <p className="mb-3 text-[14px] font-bold text-charcoal">Stops (in order)</p>
+                    <p className="mb-2 text-[14px] font-bold text-charcoal">Route name in Bangla / বাংলায় রুটের নাম</p>
+                    <BnInput
+                      value={route.name_bn}
+                      onCommit={(v) => updateBnName('routes', route.id, v)}
+                      placeholder="বাংলায় লিখুন"
+                      className="w-full max-w-md"
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-3 text-[14px] font-bold text-charcoal">Stops (in order) — English and Bangla names</p>
                     {stops.length === 0 && <p className="mb-3 text-[13px] text-charcoal/45">No stops yet.</p>}
                     <div className="space-y-2">
                       {stops.map((s, i) => (
@@ -197,7 +243,13 @@ export default function AdminRoutesPage() {
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mint font-num text-[12.5px] font-bold text-emerald-dark">
                             {i + 1}
                           </span>
-                          <span className="flex-1 text-[13.5px] font-bold text-charcoal">{s.name}</span>
+                          <span className="min-w-0 flex-1 text-[13.5px] font-bold text-charcoal">{s.name}</span>
+                          <BnInput
+                            value={s.name_bn}
+                            onCommit={(v) => updateBnName('route_stops', s.id, v)}
+                            placeholder="বাংলা নাম"
+                            className={`w-40 ${s.name_bn ? '' : 'border-amber/60'}`}
+                          />
                           <button onClick={() => moveStop(route.id, i, -1)} disabled={i === 0} className={smallButton} aria-label="Move up">↑</button>
                           <button onClick={() => moveStop(route.id, i, 1)} disabled={i === stops.length - 1} className={smallButton} aria-label="Move down">↓</button>
                           <button onClick={() => deleteStop(s)} className={`${smallButton} border-danger/30 text-danger hover:bg-danger/5`} aria-label="Delete stop">✕</button>
@@ -209,7 +261,14 @@ export default function AdminRoutesPage() {
                         value={newStopInputs[route.id] || ''}
                         onChange={(e) => setNewStopInputs((prev) => ({ ...prev, [route.id]: e.target.value }))}
                         onKeyDown={(e) => { if (e.key === 'Enter') addStop(route.id) }}
-                        placeholder="Add next stop"
+                        placeholder="Add next stop (English)"
+                        className={`${inputClass} min-w-[200px] flex-1`}
+                      />
+                      <input
+                        value={newStopBnInputs[route.id] || ''}
+                        onChange={(e) => setNewStopBnInputs((prev) => ({ ...prev, [route.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') addStop(route.id) }}
+                        placeholder="বাংলায় স্টপের নাম"
                         className={`${inputClass} min-w-[200px] flex-1`}
                       />
                       <button
@@ -232,14 +291,20 @@ export default function AdminRoutesPage() {
                             <tr>
                               <th className="whitespace-nowrap px-3 py-2.5 text-[12px] font-bold text-charcoal/45">From ↓ / To →</th>
                               {stops.slice(1).map((to) => (
-                                <th key={to.id} className="whitespace-nowrap px-3 py-2.5 text-center text-[12px] font-bold text-charcoal/60">{to.name}</th>
+                                <th key={to.id} className="whitespace-nowrap px-3 py-2.5 text-center text-[12px] font-bold text-charcoal/60">
+                                  {to.name}
+                                  {to.name_bn && <span className="block text-[11.5px] font-semibold text-emerald">{to.name_bn}</span>}
+                                </th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {stops.slice(0, -1).map((from, i) => (
                               <tr key={from.id}>
-                                <td className="whitespace-nowrap border-t border-line-soft px-3 py-2 text-[13px] font-bold text-charcoal">{from.name}</td>
+                                <td className="whitespace-nowrap border-t border-line-soft px-3 py-2 text-[13px] font-bold text-charcoal">
+                                  {from.name}
+                                  {from.name_bn && <span className="block text-[11.5px] font-semibold text-emerald">{from.name_bn}</span>}
+                                </td>
                                 {stops.slice(1).map((to, offset) => {
                                   const j = offset + 1
                                   if (j <= i) {

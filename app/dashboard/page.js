@@ -46,7 +46,7 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <p className="text-[13px] text-charcoal/60">{t('welcome')}</p>
-            <p className="truncate text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
+            <p className="line-clamp-2 break-words text-lg font-bold leading-tight text-charcoal">{profile.name}</p>
           </div>
         </div>
         <HeaderActions profile />

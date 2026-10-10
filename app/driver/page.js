@@ -10,6 +10,7 @@ import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
 import HeaderActions from '@/components/ui/HeaderActions'
 import { IconCar, IconAutoRickshaw } from '@/components/ui/Icons'
+import { localName, stopText, money, num } from '@/lib/names'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
@@ -39,13 +40,13 @@ function Chip({ children, tone = 'plain' }) {
   )
 }
 
-function Gauge({ label, value, max }) {
+function Gauge({ label, value, max, lang }) {
   const pct = Math.min(100, Math.round((value / max) * 100))
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-[12.5px] font-semibold text-charcoal/60">
         <span>{label}</span>
-        <span className="font-num font-bold text-charcoal">{value}/{max}</span>
+        <span className="font-num font-bold text-charcoal">{num(value, lang)}/{num(max, lang)}</span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-line-soft">
         <div className={`h-full rounded-full ${pct >= 100 ? 'bg-amber' : 'bg-emerald'}`} style={{ width: `${pct}%` }} />
@@ -81,7 +82,7 @@ export default function DriverPage() {
   const [isFlagged, setIsFlagged] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const router = useRouter()
 
   // Reserve-ride state (unchanged from before)
@@ -95,6 +96,7 @@ export default function DriverPage() {
 
   // Shared-ride / trip state
   const [routes, setRoutes] = useState([])
+  const [stopsByRoute, setStopsByRoute] = useState({})
   const [selectedRouteId, setSelectedRouteId] = useState('')
   const [vehicleType, setVehicleType] = useState('cng')
   const [activeTrip, setActiveTrip] = useState(null)
@@ -115,6 +117,15 @@ export default function DriverPage() {
   const profileChannelRef = useRef(null)
   const routeChannelRef = useRef(null)
 
+  const loadRouteData = async () => {
+    const { data: routeRows } = await supabase.from('routes').select('*').order('id')
+    const { data: stopRows } = await supabase.from('route_stops').select('*').order('position')
+    const stops = {}
+    ;(stopRows || []).forEach((s) => { (stops[s.route_id] = stops[s.route_id] || []).push(s) })
+    setRoutes(routeRows || [])
+    setStopsByRoute(stops)
+  }
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -132,14 +143,11 @@ export default function DriverPage() {
         .subscribe()
       profileChannelRef.current = profileChannel
 
-      const { data: routeRows } = await supabase.from('routes').select('*').order('id')
-      setRoutes(routeRows || [])
+      await loadRouteData()
       routeChannelRef.current = supabase
         .channel('route-list-' + Math.random().toString(36).slice(2))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'routes' }, async () => {
-          const { data } = await supabase.from('routes').select('*').order('id')
-          setRoutes(data || [])
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'routes' }, () => loadRouteData())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'route_stops' }, () => loadRouteData())
         .subscribe()
 
       const { data: openTrip } = await supabase.from('trips').select('*')
@@ -521,7 +529,9 @@ export default function DriverPage() {
     return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
   }
 
-  const routeName = (id) => routes.find((r) => r.id === id)?.name
+  const routeName = (id) => localName(routes.find((r) => r.id === id), lang)
+  const placeName = (ride, which) =>
+    stopText(stopsByRoute[ride.route_id], which === 'pickup' ? ride.pickup : ride.destination, lang)
   const timeLabel = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   return (
@@ -547,7 +557,7 @@ export default function DriverPage() {
           <Field label={t('routeLabel')}>
             <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} className={selectClass}>
               <option value="">{routes.length === 0 ? t('noRoutesYet') : t('selectPlaceholder')}</option>
-              {routes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              {routes.map((r) => <option key={r.id} value={r.id}>{localName(r, lang)}</option>)}
             </select>
           </Field>
           <div>
@@ -578,13 +588,13 @@ export default function DriverPage() {
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald" />
                 <p className="font-bold text-charcoal">{t('onlineOnRoute')}</p>
               </div>
-              <Chip tone="green">{t('queuePosition')}: #{queuePosition}</Chip>
+              <Chip tone="green">{t('queuePosition')}: #{num(queuePosition, lang)}</Chip>
             </div>
             <p className="mt-1 text-[16px] font-bold text-emerald">{routeName(activeTrip.route_id)}</p>
             <p className="text-[13px] text-charcoal/60">{vehicleLabel(activeTrip.vehicle_type)}</p>
             <div className="mt-4 space-y-3">
-              <Gauge label={t('seatsFilled')} value={filledSeats} max={capacity} />
-              {activeTrip.vehicle_type === 'cng' && <Gauge label={t('womenAboard')} value={womenSeats} max={backSeats} />}
+              <Gauge label={t('seatsFilled')} value={filledSeats} max={capacity} lang={lang} />
+              {activeTrip.vehicle_type === 'cng' && <Gauge label={t('womenAboard')} value={womenSeats} max={backSeats} lang={lang} />}
             </div>
             <button onClick={handleGoOffline} disabled={loading} className={`${dangerButtonClass} mt-4`}>
               {t('goOffline')}
@@ -593,15 +603,15 @@ export default function DriverPage() {
 
           {tripPassengers.length > 0 && (
             <div>
-              <h3 className="mb-2 text-[15px] font-bold text-charcoal">{t('passengersOnBoard')} ({filledSeats}/{capacity})</h3>
+              <h3 className="mb-2 text-[15px] font-bold text-charcoal">{t('passengersOnBoard')} ({num(filledSeats, lang)}/{num(capacity, lang)})</h3>
               <div className="space-y-2">
                 {tripPassengers.map((p) => (
                   <div key={p.id} className="rounded-xl border-2 border-line-soft bg-white p-3">
-                    <StopPair fromLabel={t('boardsAt')} from={p.pickup} toLabel={t('getsOffAt')} to={p.destination} />
+                    <StopPair fromLabel={t('boardsAt')} from={placeName(p, 'pickup')} toLabel={t('getsOffAt')} to={placeName(p, 'destination')} />
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Chip>{p.seats} {t('seats')}</Chip>
-                      {p.women_seats > 0 && <Chip tone="amber">{p.women_seats} {t('womenShort')}</Chip>}
-                      <Chip tone="green">৳{p.fare}</Chip>
+                      <Chip>{num(p.seats, lang)} {t('seats')}</Chip>
+                      {p.women_seats > 0 && <Chip tone="amber">{num(p.women_seats, lang)} {t('womenShort')}</Chip>}
+                      <Chip tone="green">{money(p.fare, lang)}</Chip>
                     </div>
                   </div>
                 ))}
@@ -621,13 +631,13 @@ export default function DriverPage() {
                 <SectionCard key={r.id} className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <StopPair fromLabel={t('boardsAt')} from={r.pickup} toLabel={t('getsOffAt')} to={r.destination} />
+                      <StopPair fromLabel={t('boardsAt')} from={placeName(r, 'pickup')} toLabel={t('getsOffAt')} to={placeName(r, 'destination')} />
                     </div>
-                    <p className="font-num text-[24px] font-extrabold text-emerald">৳{r.fare}</p>
+                    <p className="font-num text-[24px] font-extrabold text-emerald">{money(r.fare, lang)}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Chip>{r.seats} {t('seats')}</Chip>
-                    {r.women_seats > 0 && <Chip tone="amber">{r.women_seats} {t('womenShort')}</Chip>}
+                    <Chip>{num(r.seats, lang)} {t('seats')}</Chip>
+                    {r.women_seats > 0 && <Chip tone="amber">{num(r.women_seats, lang)} {t('womenShort')}</Chip>}
                   </div>
                   {!canFit(r) && <p className="text-[13px] font-semibold text-danger">{t('noRoomForThis')}</p>}
                   <PrimaryButton onClick={() => handleAcceptPassenger(r)} disabled={loading || !canFit(r)}>
@@ -649,17 +659,17 @@ export default function DriverPage() {
           <SectionCard className="border-emerald">
             <p className="font-bold text-emerald">{t('tripInProgress')}</p>
             <p className="mt-1 text-[14px] text-charcoal/70">
-              {routeName(activeTrip.route_id)} · {tripPassengers.length} {t('passengersOnBoard')}
+              {routeName(activeTrip.route_id)} · {num(tripPassengers.length, lang)} {t('passengersOnBoard')}
             </p>
           </SectionCard>
 
           {tripPassengers.map((p) => (
             <SectionCard key={p.id} className="space-y-3">
-              <StopPair fromLabel={t('boardsAt')} from={p.pickup} toLabel={t('getsOffAt')} to={p.destination} />
-              <p className="font-num text-[24px] font-extrabold text-emerald">৳{p.fare}</p>
+              <StopPair fromLabel={t('boardsAt')} from={placeName(p, 'pickup')} toLabel={t('getsOffAt')} to={placeName(p, 'destination')} />
+              <p className="font-num text-[24px] font-extrabold text-emerald">{money(p.fare, lang)}</p>
               {confirmingRideId === p.id ? (
                 <div className="space-y-2">
-                  <p className="text-[14px] font-semibold text-charcoal">{t('confirmCashFrom')} ৳{p.fare}?</p>
+                  <p className="text-[14px] font-semibold text-charcoal">{t('confirmCashFrom')} {money(p.fare, lang)}?</p>
                   <PrimaryButton onClick={() => handleConfirmCash(p)} disabled={loading}>
                     {t('yesReceived')}{p.fare}
                   </PrimaryButton>
@@ -689,9 +699,9 @@ export default function DriverPage() {
       {activeReserveRide && (
         <SectionCard className="mb-4 space-y-3 border-emerald">
           <p className="font-bold text-emerald">{t('yourActiveRide')}</p>
-          <StopPair fromLabel={t('from')} from={activeReserveRide.pickup} toLabel={t('to')} to={activeReserveRide.destination} />
+          <StopPair fromLabel={t('from')} from={placeName(activeReserveRide, 'pickup')} toLabel={t('to')} to={placeName(activeReserveRide, 'destination')} />
           <p className="text-[14px] text-charcoal/60">
-            {t('fare')}: <span className="font-num text-[22px] font-extrabold text-emerald">৳{activeReserveRide.fare}</span>
+            {t('fare')}: <span className="font-num text-[22px] font-extrabold text-emerald">{money(activeReserveRide.fare, lang)}</span>
           </p>
 
           {!confirmingReserveComplete ? (
@@ -714,9 +724,9 @@ export default function DriverPage() {
 
       {negotiatingRide ? (
         <SectionCard className="space-y-3">
-          <StopPair fromLabel={t('from')} from={negotiatingRide.pickup} toLabel={t('to')} to={negotiatingRide.destination} />
+          <StopPair fromLabel={t('from')} from={placeName(negotiatingRide, 'pickup')} toLabel={t('to')} to={placeName(negotiatingRide, 'destination')} />
           <div className="flex flex-wrap gap-2">
-            <Chip>{negotiatingRide.seats} {t('seats')}</Chip>
+            <Chip>{num(negotiatingRide.seats, lang)} {t('seats')}</Chip>
             {negotiatingRide.pickup_time && <Chip tone="amber">{t('pickupAt')}: {timeLabel(negotiatingRide.pickup_time)}</Chip>}
           </div>
 
@@ -724,7 +734,7 @@ export default function DriverPage() {
             <>
               <div>
                 <p className="text-[13px] font-semibold text-charcoal/60">{t('youQuoted')}</p>
-                <p className="font-num text-[32px] font-extrabold text-charcoal">৳{latestBid.amount}</p>
+                <p className="font-num text-[32px] font-extrabold text-charcoal">{money(latestBid.amount, lang)}</p>
               </div>
               <p className="text-[14px] text-charcoal/60">{t('waitingForPassengerResponse')}</p>
             </>
@@ -734,10 +744,10 @@ export default function DriverPage() {
             <>
               <div>
                 <p className="text-[13px] font-semibold text-charcoal/60">{t('passengerCountered')}</p>
-                <p className="font-num text-[32px] font-extrabold text-emerald">৳{latestBid.amount}</p>
+                <p className="font-num text-[32px] font-extrabold text-emerald">{money(latestBid.amount, lang)}</p>
               </div>
               <PrimaryButton onClick={handleAcceptCounter} disabled={loading}>
-                {t('accept')} ৳{latestBid.amount}
+                {t('accept')} {money(latestBid.amount, lang)}
               </PrimaryButton>
               <input
                 type="number"
@@ -760,7 +770,7 @@ export default function DriverPage() {
             <>
               <div>
                 <p className="text-[13px] font-semibold text-charcoal/60">{t('youSentFinalOffer')}</p>
-                <p className="font-num text-[32px] font-extrabold text-charcoal">৳{latestBid.amount}</p>
+                <p className="font-num text-[32px] font-extrabold text-charcoal">{money(latestBid.amount, lang)}</p>
               </div>
               <p className="text-[14px] text-charcoal/60">{t('waitingForPassengerDecision')}</p>
             </>
@@ -776,9 +786,9 @@ export default function DriverPage() {
           <div className="space-y-3">
             {reserveRequests.filter(notExpired).map((r) => (
               <SectionCard key={r.id} className="space-y-3">
-                <StopPair fromLabel={t('from')} from={r.pickup} toLabel={t('to')} to={r.destination} />
+                <StopPair fromLabel={t('from')} from={placeName(r, 'pickup')} toLabel={t('to')} to={placeName(r, 'destination')} />
                 <div className="flex flex-wrap gap-2">
-                  <Chip>{r.seats} {t('seats')}</Chip>
+                  <Chip>{num(r.seats, lang)} {t('seats')}</Chip>
                   <Chip tone="amber">{t('pickupAt')}: {r.pickup_time ? timeLabel(r.pickup_time) : t('pickupNow')}</Chip>
                 </div>
                 <input

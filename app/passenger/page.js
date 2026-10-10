@@ -11,6 +11,7 @@ import SectionCard from '@/components/ui/SectionCard'
 import HeaderActions from '@/components/ui/HeaderActions'
 import FloatingSos from '@/components/ui/FloatingSos'
 import { IconCar, IconAutoRickshaw, IconPhoneCall } from '@/components/ui/Icons'
+import { localName, stopText, money, num } from '@/lib/names'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const formatLeft = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
@@ -137,7 +138,7 @@ export default function PassengerPage() {
   const bidsChannelRef = useRef(null)
   const routeChannelRef = useRef(null)
   const profileChannelRef = useRef(null)
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
 
   const capacity = CAPACITY[vehicleType]
   const routeStops = stopsByRoute[routeId] || []
@@ -443,6 +444,8 @@ export default function PassengerPage() {
     setRatingSubmitted(false)
   }
 
+  const placeName = (ride, which) =>
+    stopText(stopsByRoute[ride.route_id], which === 'pickup' ? ride.pickup : ride.destination, lang)
   const typeLabel = (rt) => (rt === 'reserve' ? t('reserve') : t('shared'))
   const vehicleLabel = (v) => (v === 'auto' ? t('auto2') : t('cng5'))
 
@@ -451,9 +454,9 @@ export default function PassengerPage() {
       <Screen>
         <h1 className="mb-4 text-[22px] font-bold text-charcoal">{t('rateYourTrip')}</h1>
         <SectionCard className="mb-6">
-          <p className="font-bold text-charcoal">{ratingRide.pickup} → {ratingRide.destination}</p>
+          <p className="font-bold text-charcoal">{placeName(ratingRide, 'pickup')} → {placeName(ratingRide, 'destination')}</p>
           <p className="mt-1 text-[14px] text-charcoal/60">
-            {t('farePaid')}: <span className="font-num font-bold text-charcoal">৳{ratingRide.fare}</span>
+            {t('farePaid')}: <span className="font-num font-bold text-charcoal">{money(ratingRide.fare, lang)}</span>
           </p>
         </SectionCard>
 
@@ -557,11 +560,11 @@ export default function PassengerPage() {
             <div className="flex-1 space-y-3">
               <div>
                 <p className="text-[12px] text-charcoal/50">{t('from')}</p>
-                <p className="font-bold text-charcoal">{activeRide.pickup}</p>
+                <p className="font-bold text-charcoal">{placeName(activeRide, 'pickup')}</p>
               </div>
               <div>
                 <p className="text-[12px] text-charcoal/50">{t('to')}</p>
-                <p className="font-bold text-charcoal">{activeRide.destination}</p>
+                <p className="font-bold text-charcoal">{placeName(activeRide, 'destination')}</p>
               </div>
             </div>
           </div>
@@ -569,7 +572,7 @@ export default function PassengerPage() {
             <Chip tone="green">{t(activeRide.status)}</Chip>
             <Chip>{typeLabel(activeRide.ride_type)}</Chip>
             <Chip>{vehicleLabel(activeRide.vehicle_type)}</Chip>
-            <Chip>{activeRide.seats} {t('seats')}</Chip>
+            <Chip>{num(activeRide.seats, lang)} {t('seats')}</Chip>
             {activeRide.pickup_time && (
               <Chip tone="amber">
                 {t('pickupAt')}: {new Date(activeRide.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -612,7 +615,7 @@ export default function PassengerPage() {
                 <p className="font-bold text-danger">{t('noDriverFound')}</p>
                 <div className="mt-3">
                   <PrimaryButton onClick={handleExtendWait} disabled={loading}>
-                    {t('keepWaiting')} {waitMinutes} {t('minutesShort')}
+                    {t('keepWaiting')} {num(waitMinutes, lang)} {t('minutesShort')}
                   </PrimaryButton>
                 </div>
               </SectionCard>
@@ -629,7 +632,7 @@ export default function PassengerPage() {
                   {activeRide.expires_at && (
                     <p className="mt-0.5 text-[13px] text-amber-dark">
                       {t('waitingTimeLeft')}:{' '}
-                      <span className="font-num font-bold">{formatLeft(new Date(activeRide.expires_at).getTime() - nowMs)}</span>
+                      <span className="font-num font-bold">{num(formatLeft(new Date(activeRide.expires_at).getTime() - nowMs), lang)}</span>
                     </p>
                   )}
                 </div>
@@ -647,10 +650,10 @@ export default function PassengerPage() {
               <>
                 <div>
                   <p className="text-[13px] font-semibold text-charcoal/60">{t('driverQuoted')}</p>
-                  <p className="font-num text-[32px] font-extrabold text-emerald">৳{latestBid.amount}</p>
+                  <p className="font-num text-[32px] font-extrabold text-emerald">{money(latestBid.amount, lang)}</p>
                 </div>
                 <PrimaryButton onClick={handleAcceptBid} disabled={loading}>
-                  {t('accept')} ৳{latestBid.amount}
+                  {t('accept')} {money(latestBid.amount, lang)}
                 </PrimaryButton>
                 <form onSubmit={handleCounter} className="space-y-2">
                   <input
@@ -670,7 +673,7 @@ export default function PassengerPage() {
               <>
                 <div>
                   <p className="text-[13px] font-semibold text-charcoal/60">{t('youOffered')}</p>
-                  <p className="font-num text-[32px] font-extrabold text-charcoal">৳{latestBid.amount}</p>
+                  <p className="font-num text-[32px] font-extrabold text-charcoal">{money(latestBid.amount, lang)}</p>
                 </div>
                 <p className="text-[14px] text-charcoal/60">{t('waitingForDriverResponse')}</p>
               </>
@@ -680,11 +683,11 @@ export default function PassengerPage() {
               <>
                 <div>
                   <p className="text-[13px] font-semibold text-charcoal/60">{t('driversFinalOffer')}</p>
-                  <p className="font-num text-[32px] font-extrabold text-emerald">৳{latestBid.amount}</p>
+                  <p className="font-num text-[32px] font-extrabold text-emerald">{money(latestBid.amount, lang)}</p>
                 </div>
                 <p className="text-[13px] text-charcoal/60">{t('finalOfferNote')}</p>
                 <PrimaryButton onClick={handleAcceptBid} disabled={loading}>
-                  {t('accept')} ৳{latestBid.amount}
+                  {t('accept')} {money(latestBid.amount, lang)}
                 </PrimaryButton>
                 <PrimaryButton tone="outline" onClick={handleCancelRide} disabled={loading}>
                   {t('cancelFindAnother')}
@@ -697,7 +700,7 @@ export default function PassengerPage() {
         {activeRide.status === 'accepted' && (
           <div className="rounded-xl border-2 border-emerald/40 bg-mint px-4 py-3">
             <p className="font-bold text-emerald-dark">
-              ✅ {t('confirmedAt')} <span className="font-num">৳{activeRide.fare}</span>
+              ✅ {t('confirmedAt')} <span className="font-num">{money(activeRide.fare, lang)}</span>
             </p>
           </div>
         )}
@@ -750,7 +753,7 @@ export default function PassengerPage() {
                   className={selectClass}
                 >
                   <option value="" disabled>{routes.length === 0 ? t('noRoutesYet') : t('selectPlaceholder')}</option>
-                  {routes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  {routes.map((r) => <option key={r.id} value={r.id}>{localName(r, lang)}</option>)}
                 </select>
               </Field>
               <Field label={t('pickupStopLabel')}>
@@ -762,7 +765,7 @@ export default function PassengerPage() {
                   className={selectClass}
                 >
                   <option value="" disabled>{t('selectPlaceholder')}</option>
-                  {routeStops.slice(0, -1).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {routeStops.slice(0, -1).map((s) => <option key={s.id} value={s.id}>{localName(s, lang)}</option>)}
                 </select>
               </Field>
               <Field label={t('dropStopLabel')}>
@@ -774,7 +777,7 @@ export default function PassengerPage() {
                   className={selectClass}
                 >
                   <option value="" disabled>{t('selectPlaceholder')}</option>
-                  {dropOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {dropOptions.map((s) => <option key={s.id} value={s.id}>{localName(s, lang)}</option>)}
                 </select>
               </Field>
             </>
@@ -813,20 +816,20 @@ export default function PassengerPage() {
               {rideType === 'reserve' ? t('peopleTraveling') : t('seatsNeeded')}
             </p>
             <Stepper
-              value={seats}
+              value={num(seats, lang)}
               onMinus={() => setSeats(Math.max(1, Number(seats) - 1))}
               onPlus={() => setSeats(Math.min(capacity, Number(seats) + 1))}
               minusDisabled={Number(seats) <= 1}
               plusDisabled={Number(seats) >= capacity}
             />
-            <p className="mt-1 text-center text-[12px] text-charcoal/50">{t('maxFor')} {capacity} {vehicleLabel(vehicleType)}</p>
+            <p className="mt-1 text-center text-[12px] text-charcoal/50">{t('maxFor')} {num(capacity, lang)} {vehicleLabel(vehicleType)}</p>
           </div>
 
           {rideType === 'shared' && (
             <div>
               <p className="mb-2 text-[13px] font-semibold text-charcoal/60">{t('womenCountLabel')}</p>
               <Stepper
-                value={womenCount}
+                value={num(womenCount, lang)}
                 onMinus={() => setWomenCount(Math.max(0, Number(womenCount) - 1))}
                 onPlus={() => setWomenCount(Math.min(maxWomen, Number(womenCount) + 1))}
                 minusDisabled={Number(womenCount) <= 0}
@@ -866,7 +869,7 @@ export default function PassengerPage() {
             <Segmented
               value={waitMinutes}
               onChange={setWaitMinutes}
-              options={[5, 10, 15].map((m) => ({ value: m, label: `${m} ${t('minutesShort')}` }))}
+              options={[5, 10, 15].map((m) => ({ value: m, label: `${num(m, lang)} ${t('minutesShort')}` }))}
             />
           </SectionCard>
         )}
@@ -875,7 +878,7 @@ export default function PassengerPage() {
           fixedFare ? (
             <div className="rounded-2xl border-2 border-emerald bg-mint px-4 py-3">
               <p className="text-[13px] font-semibold text-emerald-dark">{t('fare')}</p>
-              <p className="font-num text-[30px] font-extrabold text-emerald">৳{fixedFare}</p>
+              <p className="font-num text-[30px] font-extrabold text-emerald">{money(fixedFare, lang)}</p>
               <p className="text-[12px] text-emerald-dark">{t('cannotNegotiate')}</p>
             </div>
           ) : (
