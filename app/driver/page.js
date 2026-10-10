@@ -10,7 +10,7 @@ import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
 import HeaderActions from '@/components/ui/HeaderActions'
 import { IconCar, IconAutoRickshaw } from '@/components/ui/Icons'
-import { localName, stopText, money, num } from '@/lib/names'
+import { localName, stopText, money, num, formatTime } from '@/lib/names'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
@@ -532,7 +532,7 @@ export default function DriverPage() {
   const routeName = (id) => localName(routes.find((r) => r.id === id), lang)
   const placeName = (ride, which) =>
     stopText(stopsByRoute[ride.route_id], which === 'pickup' ? ride.pickup : ride.destination, lang)
-  const timeLabel = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const timeLabel = (iso) => formatTime(iso, lang)
 
   return (
     <Screen>

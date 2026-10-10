@@ -11,7 +11,7 @@ import SectionCard from '@/components/ui/SectionCard'
 import HeaderActions from '@/components/ui/HeaderActions'
 import FloatingSos from '@/components/ui/FloatingSos'
 import { IconCar, IconAutoRickshaw, IconPhoneCall } from '@/components/ui/Icons'
-import { localName, stopText, money, num } from '@/lib/names'
+import { localName, stopText, money, num, formatTime } from '@/lib/names'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const formatLeft = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
@@ -575,7 +575,7 @@ export default function PassengerPage() {
             <Chip>{num(activeRide.seats, lang)} {t('seats')}</Chip>
             {activeRide.pickup_time && (
               <Chip tone="amber">
-                {t('pickupAt')}: {new Date(activeRide.pickup_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {t('pickupAt')}: {formatTime(activeRide.pickup_time, lang)}
               </Chip>
             )}
           </div>
