@@ -19,6 +19,20 @@ const manrope = Manrope({
 export const metadata = {
   title: "Gram Ride",
   description: "Rural ride-sharing app",
+  applicationName: "GramRide",
+  appleWebApp: {
+    capable: true,
+    title: "Gram Ride",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
+};
+
+export const viewport = {
+  themeColor: "#00875A",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {
