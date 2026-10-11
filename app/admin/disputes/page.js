@@ -10,6 +10,7 @@ export default function AdminDisputesPage() {
   const [loading, setLoading] = useState(true)
   const [disputes, setDisputes] = useState([])
   const [profileMap, setProfileMap] = useState({})
+  const [rideMap, setRideMap] = useState({})
   const [filter, setFilter] = useState('open')
   const router = useRouter()
 
@@ -40,6 +41,18 @@ export default function AdminDisputesPage() {
   const loadDisputes = async () => {
     const { data } = await supabase.from('disputes').select('*').order('created_at', { ascending: false })
     setDisputes(data || [])
+
+    // The trip each complaint is about, so we can show when the trip happened
+    const rideIds = [...new Set((data || []).map((d) => d.ride_id).filter(Boolean))]
+    if (rideIds.length > 0) {
+      const { data: rides } = await supabase
+        .from('rides')
+        .select('id, created_at, pickup, destination, fare')
+        .in('id', rideIds)
+      const map = {}
+      ;(rides || []).forEach((r) => { map[r.id] = r })
+      setRideMap(map)
+    }
   }
 
   const subscribeToDisputes = () => {
@@ -56,6 +69,12 @@ export default function AdminDisputesPage() {
     await supabase.from('disputes').update({ status: 'resolved' }).eq('id', id)
     setDisputes((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'resolved' } : d)))
   }
+
+  // e.g. "11 Oct 2026, 3:30 PM"
+  const fmtDateTime = (iso) =>
+    iso
+      ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+      : '—'
 
   const nameFor = (id) => (id ? profileMap[id] || id : '—')
   const categoryLabel = (c) => ({ fare: 'Fare Dispute', behavior: 'Behavior', safety: 'Safety', noshow: 'No-show' }[c] || c)
@@ -88,11 +107,18 @@ export default function AdminDisputesPage() {
                 <StatusBadge tone="amber">{categoryLabel(d.category)}</StatusBadge>
                 <StatusBadge tone={d.status === 'open' ? 'red' : 'emerald'}>{d.status === 'open' ? 'Open' : 'Resolved'}</StatusBadge>
               </div>
-              <p className="text-[11.5px] font-semibold text-charcoal/40">{new Date(d.created_at).toLocaleDateString()}</p>
+              <p className="text-right text-[11.5px] font-semibold text-charcoal/50">
+                Trip: {fmtDateTime(rideMap[d.ride_id]?.created_at)}
+              </p>
             </div>
             <p className="mb-2 text-[13.5px] font-semibold leading-relaxed text-charcoal">{d.description}</p>
+            {rideMap[d.ride_id] && (
+              <p className="mb-1 text-[12px] font-semibold text-charcoal/70">
+                {rideMap[d.ride_id].pickup} → {rideMap[d.ride_id].destination} (৳{rideMap[d.ride_id].fare})
+              </p>
+            )}
             <p className="mb-3 text-[12px] font-semibold text-charcoal/50">
-              Ride #{d.ride_id} · Filed by: {nameFor(d.filed_by)} · Against: {nameFor(d.against)}
+              Ride #{d.ride_id} · Filed by: {nameFor(d.filed_by)} · Against: {nameFor(d.against)} · Filed on: {fmtDateTime(d.created_at)}
             </p>
             {d.status === 'open' && (
               <button

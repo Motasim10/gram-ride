@@ -19,7 +19,7 @@ const manrope = Manrope({
 export const metadata = {
   title: "Gram Ride",
   description: "Rural ride-sharing app",
-  applicationName: "GramRide",
+  applicationName: "Gram Ride",
   appleWebApp: {
     capable: true,
     title: "Gram Ride",

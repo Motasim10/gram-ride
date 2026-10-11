@@ -3,15 +3,23 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n'
+import { stopText, money, formatDate, formatTime } from '@/lib/names'
 import Screen from '@/components/ui/Screen'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
 
 const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
 
+// Extra text used only on this page, so lib/i18n.js does not need to change
+const EXTRA = {
+  bn: { complaintFailed: 'অভিযোগ জমা দেওয়া যায়নি। আবার চেষ্টা করুন।' },
+  en: { complaintFailed: 'Could not submit the complaint. Please try again.' },
+}
+
 export default function ComplaintsPage() {
   const [userId, setUserId] = useState(null)
   const [trips, setTrips] = useState([])
+  const [stopsByRoute, setStopsByRoute] = useState({})
   const [myComplaints, setMyComplaints] = useState([])
   const [selectedRide, setSelectedRide] = useState('')
   const [category, setCategory] = useState('fare')
@@ -21,7 +29,10 @@ export default function ComplaintsPage() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
+  const channelRef = useRef(null)
+
+  const tx = (key) => (EXTRA[lang] && EXTRA[lang][key]) || EXTRA.en[key]
 
   useEffect(() => {
     const load = async () => {
@@ -38,6 +49,12 @@ export default function ComplaintsPage() {
       setTrips(rides || [])
       if (rides && rides.length > 0) setSelectedRide(String(rides[0].id))
 
+      // Stops of every route, so pickup/destination can be shown in Bangla
+      const { data: stopRows } = await supabase.from('route_stops').select('*')
+      const stops = {}
+      ;(stopRows || []).forEach((s) => { (stops[s.route_id] = stops[s.route_id] || []).push(s) })
+      setStopsByRoute(stops)
+
       const { data: disputes } = await supabase
         .from('disputes')
         .select('*')
@@ -52,7 +69,13 @@ export default function ComplaintsPage() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
   }, [])
 
-    const channelRef = useRef(null)
+  // After a complaint is submitted, show the thank-you message for a few seconds,
+  // then bring the form back so another complaint can be filed.
+  useEffect(() => {
+    if (!submitted) return
+    const timer = setTimeout(() => setSubmitted(false), 4000)
+    return () => clearTimeout(timer)
+  }, [submitted])
 
   const subscribeToMyDisputes = (uid) => {
     const channel = supabase
@@ -81,7 +104,12 @@ export default function ComplaintsPage() {
       status: 'open',
     }).select().single()
 
-    if (insertError) { setError(insertError.message); setLoading(false); return }
+    if (insertError) {
+      console.error(insertError)
+      setError(tx('complaintFailed'))
+      setLoading(false)
+      return
+    }
 
     setMyComplaints((prev) => [data, ...prev])
     setDescription('')
@@ -95,6 +123,22 @@ export default function ComplaintsPage() {
     if (c === 'noshow') return t('catNoShow')
     return t('catFare')
   }
+
+  // Pickup/destination of a ride in the current language
+  const placeName = (ride, which) => {
+    const text = which === 'pickup' ? ride.pickup : ride.destination
+    return stopText(stopsByRoute[ride.route_id], text, lang)
+  }
+
+  // "১১ অক্টোবর ২০২৬, বিকাল ৩:৩০" — when the trip happened
+  const tripWhen = (ride) =>
+    ride.created_at ? `${formatDate(ride.created_at, lang)}, ${formatTime(ride.created_at, lang)}` : ''
+
+  // One line per trip for the dropdown. The date and time show in the green box below it.
+  const tripLabel = (ride) =>
+    `${placeName(ride, 'pickup')} → ${placeName(ride, 'destination')} (${money(ride.fare, lang)})`
+
+  const selectedTrip = trips.find((r) => String(r.id) === selectedRide)
 
   if (pageLoading) return <Screen><p className="mt-24 text-center text-charcoal/60">{t('loading')}</p></Screen>
 
@@ -117,10 +161,18 @@ export default function ComplaintsPage() {
               <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('selectARide')}</span>
               <select value={selectedRide} onChange={(e) => setSelectedRide(e.target.value)} className={selectClass}>
                 {trips.map((r) => (
-                  <option key={r.id} value={r.id}>{r.pickup} → {r.destination} (৳{r.fare})</option>
+                  <option key={r.id} value={r.id}>{tripLabel(r)}</option>
                 ))}
               </select>
             </label>
+            {selectedTrip && (
+              <div className="rounded-xl bg-mint px-3 py-2.5 text-[13.5px] font-semibold text-emerald-dark">
+                <p>{tripWhen(selectedTrip)}</p>
+                <p className="mt-0.5">
+                  {placeName(selectedTrip, 'pickup')} → {placeName(selectedTrip, 'destination')} · {money(selectedTrip.fare, lang)}
+                </p>
+              </div>
+            )}
             <label className="block">
               <span className="mb-1.5 block text-[13px] font-semibold text-charcoal/60">{t('category')}</span>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
@@ -155,7 +207,12 @@ export default function ComplaintsPage() {
         {myComplaints.map((c) => (
           <SectionCard key={c.id}>
             <div className="flex items-start justify-between gap-3">
-              <p className="font-bold text-charcoal">{categoryLabel(c.category)}</p>
+              <div>
+                <p className="font-bold text-charcoal">{categoryLabel(c.category)}</p>
+                {c.created_at && (
+                  <p className="mt-0.5 text-[12px] font-semibold text-charcoal/50">{formatDate(c.created_at, lang)}</p>
+                )}
+              </div>
               <span
                 className={`shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-bold ${c.status === 'open' ? 'border-danger/40 bg-danger/5 text-danger' : 'border-emerald/40 bg-mint text-emerald'}`}
               >

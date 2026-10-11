@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useLanguage } from '@/lib/i18n'
+import { toBnDigits, num } from '@/lib/names'
 import Screen from '@/components/ui/Screen'
 import SectionCard from '@/components/ui/SectionCard'
 import { IconPhoneCall, IconPlayCircle } from '@/components/ui/Icons'
@@ -62,6 +63,9 @@ export default function HelpPage() {
 
   const videos = (HELP_VIDEOS[role] || []).filter((v) => v.url)
 
+  // Show the hotline number with Bangla digits in Bangla (the call link keeps normal digits)
+  const hotlineShown = lang === 'bn' ? toBnDigits(HOTLINE_NUMBER) : HOTLINE_NUMBER
+
   return (
     <Screen>
       <h1 className="mb-2 text-[22px] font-bold text-charcoal">{t('helpSupport')}</h1>
@@ -75,7 +79,7 @@ export default function HelpPage() {
           href={`tel:${HOTLINE_NUMBER}`}
           className="tap-target flex w-full items-center justify-center gap-2 rounded-2xl bg-white font-num text-[18px] font-extrabold text-emerald active:bg-mint"
         >
-          <IconPhoneCall size={20} /> {HOTLINE_NUMBER}
+          <IconPhoneCall size={20} /> {hotlineShown}
         </a>
       </div>
 
@@ -84,7 +88,7 @@ export default function HelpPage() {
         {steps.map((s, i) => (
           <div key={i} className="flex gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald text-[14px] font-bold text-white">
-              {i + 1}
+              {num(i + 1, lang)}
             </div>
             <div>
               <p className="text-[14.5px] font-bold text-charcoal">{s.title}</p>
@@ -114,7 +118,7 @@ export default function HelpPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13.5px] font-bold leading-snug text-charcoal">{v.title[lang] || v.title.bn}</p>
-                {v.duration && <p className="font-num text-[12px] font-semibold text-charcoal/50">{v.duration}</p>}
+                {v.duration && <p className="font-num text-[12px] font-semibold text-charcoal/50">{num(v.duration, lang)}</p>}
               </div>
               <span className="shrink-0 text-[12.5px] font-bold text-emerald">{t('watchVideo')}</span>
             </a>
