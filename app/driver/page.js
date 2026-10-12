@@ -10,11 +10,13 @@ import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionCard from '@/components/ui/SectionCard'
 import HeaderActions from '@/components/ui/HeaderActions'
 import { IconCar, IconAutoRickshaw } from '@/components/ui/Icons'
-import { localName, stopText, money, num, formatTime } from '@/lib/names'
+import { localName, stopText, money, num, formatTime, formatDate } from '@/lib/names'
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
 const notExpired = (r) => !r.expires_at || new Date(r.expires_at).getTime() > Date.now()
+const pickupAt = (r) => new Date(r.pickup_time || r.created_at).getTime()
+const sortByPickup = (rows) => [...rows].sort((a, b) => pickupAt(a) - pickupAt(b))
 
 const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none disabled:opacity-50'
 const inputClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
@@ -103,8 +105,9 @@ export default function DriverPage() {
   const [tripPassengers, setTripPassengers] = useState([])
   const [waitingPassengers, setWaitingPassengers] = useState([])
   const [confirmingRideId, setConfirmingRideId] = useState(null)
-  const [activeReserveRide, setActiveReserveRide] = useState(null)
-  const [confirmingReserveComplete, setConfirmingReserveComplete] = useState(false)
+  const [activeReserveRides, setActiveReserveRides] = useState([])
+  const [confirmingReserveId, setConfirmingReserveId] = useState(null)
+  const [reserveBlocks, setReserveBlocks] = useState([])
 
   const ridesChannelRef = useRef(null)
   const tripChannelRef = useRef(null)
@@ -175,6 +178,7 @@ export default function DriverPage() {
       myTripChannelRef.current = myTripChannel
 
       await loadReserveRequests(user.id)
+      await refreshReserveBlocks()
       subscribeToRideChanges(user.id)
       setLoading(false)
     }
@@ -198,6 +202,7 @@ export default function DriverPage() {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && userId) {
         loadReserveRequests()
+        refreshReserveBlocks()
         supabase.from('profiles').select('flagged').eq('user_id', userId).single()
           .then(({ data }) => setIsFlagged(data?.flagged || false))
       }
@@ -276,8 +281,7 @@ export default function DriverPage() {
   const loadReserveRequests = async (uid = userId) => {
     const { data: accepted } = await supabase.from('rides').select('*')
       .eq('driver_id', uid).eq('status', 'accepted').eq('ride_type', 'reserve')
-      .order('created_at', { ascending: false }).limit(1).maybeSingle()
-    setActiveReserveRide(accepted || null)
+    setActiveReserveRides(sortByPickup(accepted || []))
 
     const { data: negotiating } = await supabase.from('rides').select('*')
       .eq('driver_id', uid).eq('status', 'negotiating').eq('ride_type', 'reserve')
@@ -289,6 +293,12 @@ export default function DriverPage() {
       .or(`pickup_time.is.null,pickup_time.gt.${new Date(Date.now() - 30 * 60 * 1000).toISOString()}`)
       .order('created_at', { ascending: true })
     setReserveRequests(open || [])
+  }
+
+  // Time windows around this driver's accepted reserve rides (set by admin in Ride rules)
+  const refreshReserveBlocks = async () => {
+    const { data } = await supabase.rpc('my_reserve_blocks')
+    setReserveBlocks(Array.isArray(data) ? data : [])
   }
 
   const loadWaitingPassengers = async (routeId) => {
@@ -331,6 +341,7 @@ export default function DriverPage() {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides' }, (payload) => {
         const row = payload.new
+        if (row.driver_id === uid && row.ride_type === 'reserve') refreshReserveBlocks()
         if (row.status !== 'searching') {
           setReserveRequests((prev) => prev.filter((r) => r.id !== row.id))
           setWaitingPassengers((prev) => prev.filter((r) => r.id !== row.id))
@@ -349,11 +360,13 @@ export default function DriverPage() {
         if (row.driver_id === uid && row.status === 'negotiating' && row.ride_type === 'reserve') setNegotiatingRide(row)
         if (row.driver_id === uid && row.status === 'accepted' && row.ride_type === 'reserve') {
           setNegotiatingRide(null)
-          setActiveReserveRide(row)
+          setActiveReserveRides((prev) => sortByPickup([...prev.filter((r) => r.id !== row.id), row]))
+        }
+        if (row.ride_type === 'reserve' && row.status !== 'accepted') {
+          setActiveReserveRides((prev) => prev.filter((r) => r.id !== row.id))
         }
         if (row.driver_id === uid && row.status === 'cancelled' && row.ride_type === 'reserve') {
           if (negotiatingRideIdRef.current === row.id) setNegotiatingRide(null)
-          setActiveReserveRide((prev) => (prev && prev.id === row.id ? null : prev))
         }
         if (row.driver_id !== uid && row.ride_type === 'reserve' && negotiatingRideIdRef.current === row.id) {
           setNegotiatingRide(null)
@@ -428,12 +441,14 @@ export default function DriverPage() {
   }
 
   // A reserve ride's own "complete trip" flow stays a simple one-shot confirm, same as before
-  const handleCompleteReserve = async () => {
+  const handleCompleteReserve = async (ride) => {
     setLoading(true)
-    await supabase.from('rides').update({ status: 'completed' }).eq('id', activeReserveRide.id).select()
-    await notify(activeReserveRide.passenger_id, 'tripComplete', { destination: activeReserveRide.destination, amount: activeReserveRide.fare })
-    setActiveReserveRide(null)
-    setConfirmingReserveComplete(false)
+    const { error: updateError } = await supabase.from('rides').update({ status: 'completed' }).eq('id', ride.id)
+    if (updateError) { setError(updateError.message); setLoading(false); return }
+    await notify(ride.passenger_id, 'tripComplete', { destination: ride.destination, amount: ride.fare })
+    setActiveReserveRides((prev) => prev.filter((r) => r.id !== ride.id))
+    setConfirmingReserveId(null)
+    await refreshReserveBlocks()
     setLoading(false)
   }
 
@@ -476,7 +491,14 @@ export default function DriverPage() {
     q.queue_pos < myPos &&
     Number(q.filled_seats) + ride.seats <= CAPACITY[q.vehicle_type] &&
     Number(q.women_seats) + (ride.women_seats || 0) <= BACK_SEATS[q.vehicle_type])
-  const visibleWaiting = waitingPassengers.filter((r) => notExpired(r) && !aheadCanFit(r))
+  const blockAt = (ms) => reserveBlocks.find((b) => ms > new Date(b.start_at).getTime() && ms < new Date(b.end_at).getTime()) || null
+  const nowBlock = blockAt(Date.now())
+  const reserveLocked = !!nowBlock
+  const reserveLockAt = nowBlock ? nowBlock.ride_at : null
+  const visibleWaiting = reserveLocked ? [] : waitingPassengers.filter((r) => notExpired(r) && !aheadCanFit(r))
+  const openReserve = reserveRequests.filter(notExpired)
+  const shownReserve = openReserve.filter((r) => !blockAt(r.pickup_time ? new Date(r.pickup_time).getTime() : Date.now()))
+  const hiddenReserveCount = openReserve.length - shownReserve.length
 
   const handleAcceptPassenger = async (ride) => {
     if (filledSeats + ride.seats > capacity) { setError('Not enough seats left for this passenger.'); return }
@@ -486,8 +508,8 @@ export default function DriverPage() {
       .update({ driver_id: userId, status: 'accepted', trip_id: activeTrip.id })
       .eq('id', ride.id).eq('status', 'searching').select().maybeSingle()
     if (!data) {
-      setError('This ride is no longer available.')
-      setWaitingPassengers((prev) => prev.filter((r) => r.id !== ride.id))
+      setError(updateError ? updateError.message : 'This ride is no longer available.')
+      if (!updateError) setWaitingPassengers((prev) => prev.filter((r) => r.id !== ride.id))
       setLoading(false)
       return
     }
@@ -550,9 +572,23 @@ export default function DriverPage() {
         </div>
       )}
       {error && <p className="mb-4 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
+      {reserveLocked && (
+        <div className="mb-4 rounded-2xl border-2 border-amber/60 bg-amber/10 p-4">
+          <p className="font-bold text-amber-dark">
+            {lang === 'bn'
+              ? `আপনার ${formatTime(reserveLockAt, lang)}-এর রিজার্ভ রাইড আছে`
+              : `You have a reserve ride at ${formatTime(reserveLockAt, lang)}`}
+          </p>
+          <p className="mt-1 text-[13px] text-charcoal/70">
+            {lang === 'bn'
+              ? 'এই রাইডের কাছাকাছি সময়ে নতুন রিকোয়েস্ট দেখা যাবে না।'
+              : 'New requests close to that ride are hidden for now.'}
+          </p>
+        </div>
+      )}
 
       {/* ---------- Shared route / trip section ---------- */}
-      {!activeTrip && (
+      {!activeTrip && !reserveLocked && (
         <SectionCard className="mb-4 space-y-4">
           <Field label={t('routeLabel')}>
             <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} className={selectClass}>
@@ -696,31 +732,45 @@ export default function DriverPage() {
       )}
 
       {/* ---------- Reserve section ---------- */}
-      {activeReserveRide && (
-        <SectionCard className="mb-4 space-y-3 border-emerald">
-          <p className="font-bold text-emerald">{t('yourActiveRide')}</p>
-          <StopPair fromLabel={t('from')} from={placeName(activeReserveRide, 'pickup')} toLabel={t('to')} to={placeName(activeReserveRide, 'destination')} />
+      {activeReserveRides.map((ride) => (
+        <SectionCard key={ride.id} className="mb-4 space-y-3 border-emerald">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-bold text-emerald">{t('yourActiveRide')}</p>
+            <Chip tone="amber">
+              {ride.pickup_time
+                ? `${formatDate(ride.pickup_time, lang)}, ${timeLabel(ride.pickup_time)}`
+                : t('pickupNow')}
+            </Chip>
+          </div>
+          <StopPair fromLabel={t('from')} from={placeName(ride, 'pickup')} toLabel={t('to')} to={placeName(ride, 'destination')} />
           <p className="text-[14px] text-charcoal/60">
-            {t('fare')}: <span className="font-num text-[22px] font-extrabold text-emerald">{money(activeReserveRide.fare, lang)}</span>
+            {t('fare')}: <span className="font-num text-[22px] font-extrabold text-emerald">{money(ride.fare, lang)}</span>
           </p>
 
-          {!confirmingReserveComplete ? (
-            <PrimaryButton onClick={() => setConfirmingReserveComplete(true)}>{t('completeTrip')}</PrimaryButton>
+          {confirmingReserveId !== ride.id ? (
+            <PrimaryButton onClick={() => setConfirmingReserveId(ride.id)}>{t('completeTrip')}</PrimaryButton>
           ) : (
             <div className="space-y-2">
-              <p className="text-[14px] font-semibold text-charcoal">{t('didYouReceive')}{activeReserveRide.fare} {t('inCash')}</p>
-              <PrimaryButton onClick={handleCompleteReserve} disabled={loading}>
-                {t('yesReceived')}{activeReserveRide.fare}
+              <p className="text-[14px] font-semibold text-charcoal">{t('didYouReceive')}{ride.fare} {t('inCash')}</p>
+              <PrimaryButton onClick={() => handleCompleteReserve(ride)} disabled={loading}>
+                {t('yesReceived')}{ride.fare}
               </PrimaryButton>
-              <PrimaryButton tone="outline" onClick={() => setConfirmingReserveComplete(false)} disabled={loading}>
+              <PrimaryButton tone="outline" onClick={() => setConfirmingReserveId(null)} disabled={loading}>
                 {t('noGoBack')}
               </PrimaryButton>
             </div>
           )}
         </SectionCard>
-      )}
+      ))}
 
       <h2 className="mb-3 mt-6 text-[18px] font-bold text-charcoal">{t('reserveRequestsTitle')}</h2>
+      {hiddenReserveCount > 0 && (
+        <p className="-mt-1 mb-3 text-[12.5px] font-semibold text-charcoal/55">
+          {lang === 'bn'
+            ? `${num(hiddenReserveCount, lang)}টি রিকোয়েস্ট আপনার বুক করা রাইডের সময়ের কাছাকাছি, তাই দেখানো হচ্ছে না।`
+            : `${hiddenReserveCount} request(s) hidden: too close to your booked ride.`}
+        </p>
+      )}
 
       {negotiatingRide ? (
         <SectionCard className="space-y-3">
@@ -778,13 +828,13 @@ export default function DriverPage() {
         </SectionCard>
       ) : (
         <>
-          {reserveRequests.filter(notExpired).length === 0 && (
+          {shownReserve.length === 0 && (
             <p className="rounded-xl border-2 border-line-soft bg-white px-3 py-4 text-center text-[14px] text-charcoal/50">
               {t('noRequestsWaiting')}
             </p>
           )}
           <div className="space-y-3">
-            {reserveRequests.filter(notExpired).map((r) => (
+            {shownReserve.map((r) => (
               <SectionCard key={r.id} className="space-y-3">
                 <StopPair fromLabel={t('from')} from={placeName(r, 'pickup')} toLabel={t('to')} to={placeName(r, 'destination')} />
                 <div className="flex flex-wrap gap-2">
