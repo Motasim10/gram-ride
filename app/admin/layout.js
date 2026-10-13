@@ -18,6 +18,7 @@ const NAV = [
   { href: '/admin/passengers', label: 'Passengers', Icon: IconUser },
   { href: '/admin/disputes', label: 'Disputes', Icon: IconAlertTriangle, badge: 'disputes' },
   { href: '/admin/payouts', label: 'Payouts', Icon: IconWallet },
+  { href: '/admin/ride-rules', label: 'Ride rules', Icon: IconClock },
   { href: '/admin/analytics', label: 'Analytics', Icon: IconBarChart },
   { href: '/admin/sos', label: 'SOS alerts', Icon: IconShieldCheck, badge: 'sos' },
 ]
