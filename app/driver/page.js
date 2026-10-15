@@ -22,7 +22,7 @@ const durText = (mins, lang) => {
   }
   return `${num(mins, lang)} ${lang === 'bn' ? 'মিনিট' : 'minutes'}`
 }
-const DEFAULT_RULES = { min_ahead: 15, max_ahead: 720, gap: 15, start_before: 10, auto_cancel: 30 }
+const DEFAULT_RULES = { min_ahead: 15, max_ahead: 720, gap: 15, start_before: 10, auto_cancel: 30, cancel_lock: 15 }
 
 const pickLang = (msg, lang) => {
   if (typeof msg !== 'string' || !msg.includes(' / ')) return msg
@@ -163,6 +163,7 @@ export default function DriverPage() {
   const [reserveBlocks, setReserveBlocks] = useState([])
   const [goMode, setGoMode] = useState('now')
   const [dep, setDep] = useState(defaultDeparture)
+  const [askReason, setAskReason] = useState(false)
   const [rules, setRules] = useState(DEFAULT_RULES)
   const activeDepartureIdRef = useRef(null)
 
@@ -570,10 +571,11 @@ export default function DriverPage() {
     setLoading(false)
   }
 
-  const handleCancelDeparture = async () => {
+  const handleCancelDeparture = async (reason) => {
     setLoading(true); setError('')
-    const { error: cancelError } = await supabase.from('trips').update({ status: 'cancelled' }).eq('id', activeTrip.id)
+    const { error: cancelError } = await supabase.from('trips').update({ status: 'cancelled', cancel_reason: reason }).eq('id', activeTrip.id)
     if (cancelError) { setError(cancelError.message); setLoading(false); return }
+    setAskReason(false)
     setActiveTrip(null)
     setTripPassengers([])
     setWaitingPassengers([])
@@ -779,10 +781,37 @@ export default function DriverPage() {
             )}
             {activeTrip.departure_at ? (
               <>
-                <button onClick={handleCancelDeparture} disabled={loading || tripPassengers.length > 0} className={`${dangerButtonClass} mt-4`}>
-                  {t('cancelDeparture')}
-                </button>
-                {tripPassengers.length > 0 && <p className="mt-2 text-[12px] text-charcoal/50">{t('cannotCancelWithPassengers')}</p>}
+                {(() => {
+                  const cancelLocked = rules.cancel_lock > 0 && Date.now() > new Date(activeTrip.departure_at).getTime() - rules.cancel_lock * 60000
+                  if (askReason) {
+                    return (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-[14px] font-semibold text-charcoal">{t('cancelWhy')}</p>
+                        {[['breakdown', 'reasonBreakdown'], ['no_passengers', 'reasonNoPassengers'], ['other', 'reasonOther']].map(([key, label]) => (
+                          <button key={key} onClick={() => handleCancelDeparture(key)} disabled={loading} className={dangerButtonClass}>
+                            {t(label)}
+                          </button>
+                        ))}
+                        <button onClick={() => setAskReason(false)} className="w-full py-2 text-[14px] font-semibold text-charcoal/50 underline">{t('back')}</button>
+                      </div>
+                    )
+                  }
+                  return (
+                    <>
+                      <button onClick={() => setAskReason(true)} disabled={loading || tripPassengers.length > 0 || cancelLocked} className={`${dangerButtonClass} mt-4`}>
+                        {t('cancelDeparture')}
+                      </button>
+                      {tripPassengers.length > 0 && <p className="mt-2 text-[12px] text-charcoal/50">{t('cannotCancelWithPassengers')}</p>}
+                      {cancelLocked && tripPassengers.length === 0 && (
+                        <p className="mt-2 text-[12px] text-charcoal/50">
+                          {lang === 'bn'
+                            ? `ছাড়ার ${durText(rules.cancel_lock, lang)} আগের পর যাত্রা বাতিল করা যায় না।`
+                            : `A departure cannot be cancelled in the last ${durText(rules.cancel_lock, lang)} before it leaves.`}
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
               </>
             ) : (
               <button onClick={handleGoOffline} disabled={loading} className={`${dangerButtonClass} mt-4`}>

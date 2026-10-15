@@ -24,6 +24,9 @@ export default function AdminRideRulesPage() {
   const [gap, setGap] = useState('15')
   const [startBefore, setStartBefore] = useState('10')
   const [autoCancel, setAutoCancel] = useState('30')
+  const [cancelLock, setCancelLock] = useState('15')
+  const [statDays, setStatDays] = useState(30)
+  const [stats, setStats] = useState([])
   const [savingDep, setSavingDep] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
@@ -39,7 +42,7 @@ export default function AdminRideRulesPage() {
 
       const { data } = await supabase.from('settings').select('key, value')
                 .in('key', ['reserve_buffer_before_min', 'reserve_buffer_after_min', 'reserve_max_rides',
-          'departure_min_ahead_min', 'departure_max_ahead_min', 'departure_min_gap_min', 'departure_start_before_min', 'departure_auto_cancel_min'])
+          'departure_min_ahead_min', 'departure_max_ahead_min', 'departure_min_gap_min', 'departure_start_before_min', 'departure_auto_cancel_min', 'departure_cancel_lock_min'])
       const map = {}
       ;(data || []).forEach((s) => { map[s.key] = s.value })
       setBefore(map.reserve_buffer_before_min ?? '60')
@@ -50,10 +53,16 @@ export default function AdminRideRulesPage() {
       setGap(map.departure_min_gap_min ?? '15')
       setStartBefore(map.departure_start_before_min ?? '10')
       setAutoCancel(map.departure_auto_cancel_min ?? '30')
+      setCancelLock(map.departure_cancel_lock_min ?? '15')
       setLoading(false)
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (!authorized) return
+    supabase.rpc('departure_stats', { p_days: statDays }).then(({ data }) => setStats(data || []))
+  }, [authorized, statDays])
 
   const save = async () => {
     const b = Number(before)
@@ -74,16 +83,17 @@ export default function AdminRideRulesPage() {
   }
 
   const saveDeparture = async () => {
-    const vals = { min: Number(minAhead), max: Number(maxAhead), gap: Number(gap), start: Number(startBefore), cancel: Number(autoCancel) }
-    if ([minAhead, maxAhead, gap, startBefore, autoCancel].some((v) => String(v).trim() === '')) { setNotice('Please fill all five boxes.'); return }
+    const vals = { min: Number(minAhead), max: Number(maxAhead), gap: Number(gap), start: Number(startBefore), cancel: Number(autoCancel), lock: Number(cancelLock) }
+    if ([minAhead, maxAhead, gap, startBefore, autoCancel, cancelLock].some((v) => String(v).trim() === '')) { setNotice('Please fill all six boxes.'); return }
     if (Object.values(vals).some((v) => !Number.isInteger(v) || v < 0)) { setNotice('Use whole numbers (0 or more).'); return }
     if (vals.min < 1 || vals.min > 180) { setNotice('Earliest departure must be 1 to 180 minutes from now.'); return }
     if (vals.max < 30 || vals.max > 1440 || vals.max <= vals.min) { setNotice('Latest departure must be 30 to 1440 minutes and more than the earliest.'); return }
     if (vals.gap > 120) { setNotice('Gap between drivers can be at most 120 minutes.'); return }
     if (vals.cancel !== 0 && (vals.cancel < 5 || vals.cancel > 240)) { setNotice('Automatic cancel must be 0 (never) or 5 to 240 minutes.'); return }
+    if (vals.lock > 120) { setNotice('Cancel lock can be at most 120 minutes.'); return }
     if (vals.start > 120) { setNotice('Start window can be at most 120 minutes.'); return }
     setSavingDep(true)
-    for (const [key, value] of [['departure_min_ahead_min', vals.min], ['departure_max_ahead_min', vals.max], ['departure_min_gap_min', vals.gap], ['departure_start_before_min', vals.start], ['departure_auto_cancel_min', vals.cancel]]) {
+    for (const [key, value] of [['departure_min_ahead_min', vals.min], ['departure_max_ahead_min', vals.max], ['departure_min_gap_min', vals.gap], ['departure_start_before_min', vals.start], ['departure_auto_cancel_min', vals.cancel], ['departure_cancel_lock_min', vals.lock]]) {
       const { error } = await supabase.from('settings').update({ value: String(value) }).eq('key', key)
       if (error) { setNotice('Could not save: ' + error.message); setSavingDep(false); return }
     }
@@ -174,6 +184,10 @@ export default function AdminRideRulesPage() {
             <span className="mb-1 block text-[12.5px] font-bold text-charcoal/55">Cancel automatically if not started, minutes AFTER (0 = never)</span>
             <input type="number" value={autoCancel} onChange={(e) => setAutoCancel(e.target.value)} className={`${inputClass} w-28 font-num`} />
           </label>
+          <label className="block">
+            <span className="mb-1 block text-[12.5px] font-bold text-charcoal/55">Driver cannot cancel in the last ... minutes before departure (0 = always allowed)</span>
+            <input type="number" value={cancelLock} onChange={(e) => setCancelLock(e.target.value)} className={`${inputClass} w-28 font-num`} />
+          </label>
           <button
             onClick={saveDeparture}
             disabled={savingDep}
@@ -198,6 +212,63 @@ export default function AdminRideRulesPage() {
               : <> Departures are never cancelled automatically.</>}
           </p>
         </div>
+      </Panel>
+
+      <Panel title="Departure reliability by driver">
+        <div className="mb-3 flex items-center gap-2 text-[13px] text-charcoal/60">
+          <span>Period:</span>
+          {[7, 30, 90].map((d) => (
+            <button
+              key={d}
+              onClick={() => setStatDays(d)}
+              className={`rounded-lg border-2 px-3 py-1 text-[12.5px] font-bold ${statDays === d ? 'border-emerald bg-emerald text-white' : 'border-line-soft bg-white text-charcoal/70'}`}
+            >
+              {d} days
+            </button>
+          ))}
+        </div>
+        {stats.length === 0 ? (
+          <p className="text-[13px] text-charcoal/50">No departures in this period.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-[13px]">
+              <thead>
+                <tr className="border-b-2 border-line-soft text-[12px] font-bold text-charcoal/55">
+                  <th className="py-2 pr-3">Driver</th>
+                  <th className="py-2 pr-3">Posted</th>
+                  <th className="py-2 pr-3">Started</th>
+                  <th className="py-2 pr-3">Cancelled by driver</th>
+                  <th className="py-2 pr-3">Not started (auto)</th>
+                  <th className="py-2 pr-3">Vehicle problem</th>
+                  <th className="py-2">No passengers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((r) => {
+                  const bad = Number(r.posted) >= 3 && Number(r.started) === 0
+                  return (
+                    <tr key={r.driver_id} className={`border-b border-line-soft ${bad ? 'bg-danger/5' : ''}`}>
+                      <td className="py-2 pr-3">
+                        <p className="font-bold text-charcoal">{r.driver_name || 'Unknown'}</p>
+                        <p className="font-num text-[12px] text-charcoal/50">{r.phone}</p>
+                      </td>
+                      <td className="py-2 pr-3 font-num font-bold">{r.posted}</td>
+                      <td className="py-2 pr-3 font-num font-bold text-emerald">{r.started}</td>
+                      <td className="py-2 pr-3 font-num font-bold">{r.cancelled}</td>
+                      <td className="py-2 pr-3 font-num font-bold">{r.auto_cancelled}</td>
+                      <td className="py-2 pr-3 font-num">{r.breakdown}</td>
+                      <td className="py-2 font-num">{r.no_passengers}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-3 text-[12px] text-charcoal/50">
+          A red row means the driver posted 3 or more departures and never started one. If you suspect a driver is taking
+          passengers outside the app, you can flag him on the Drivers page.
+        </p>
       </Panel>
     </div>
   )
