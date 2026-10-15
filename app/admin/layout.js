@@ -35,7 +35,7 @@ function SidebarContent({ pathname, counts, onNavigate, onLogout }) {
           <IconAutoRickshaw size={20} className="text-white" />
         </div>
         <div>
-          <p className="font-num text-[16px] font-extrabold leading-none">Gram Ride</p>
+          <p className="font-num text-[16px] font-extrabold leading-none">GramJatra</p>
           <p className="mt-0.5 text-[11.5px] font-semibold text-white/50">Admin panel</p>
         </div>
       </div>

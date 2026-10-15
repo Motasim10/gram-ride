@@ -17,12 +17,12 @@ const manrope = Manrope({
 });
 
 export const metadata = {
-  title: "Gram Ride",
+  title: "GramJatra",
   description: "Rural ride-sharing app",
-  applicationName: "Gram Ride",
+  applicationName: "GramJatra",
   appleWebApp: {
     capable: true,
-    title: "Gram Ride",
+    title: "GramJatra",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },

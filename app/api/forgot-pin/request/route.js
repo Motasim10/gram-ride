@@ -39,6 +39,6 @@ export async function POST(req) {
     code_hash: hash(phone, code),
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   })
-  await sendSms(phone, `Gram Ride code: ${code}. Valid for 10 minutes. Do not share it with anyone.`)
+  await sendSms(phone, `GramJatra code: ${code}. Valid for 10 minutes. Do not share it with anyone.`)
   return same
 }

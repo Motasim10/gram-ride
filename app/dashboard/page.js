@@ -11,13 +11,13 @@ import { IconClock, IconWallet, IconMessageSquare, IconHelpCircle, IconCar, Icon
 
 const TEXT = {
   bn: {
-    tagline: 'আপনার যাত্রা, GramRide-এর সাথে',
+    tagline: 'আপনার যাত্রা, GramJatra-এর সাথে',
     salam: 'আসসালামু আলাইকুম!',
     askPassenger: 'কোথায় যেতে চান?',
     askDriver: 'যাত্রী নিতে প্রস্তুত?',
   },
   en: {
-    tagline: 'Your journey, with GramRide',
+    tagline: 'Your journey, with GramJatra',
     salam: 'Assalamu Alaikum!',
     askPassenger: 'Where would you like to go?',
     askDriver: 'Ready to pick up passengers?',
@@ -61,7 +61,7 @@ export default function Dashboard() {
             <IconCar size={22} />
           </div>
           <div className="min-w-0">
-            <p className="text-[17px] font-extrabold leading-tight text-charcoal">GramRide</p>
+            <p className="text-[17px] font-extrabold leading-tight text-charcoal">{lang === 'bn' ? 'গ্রামযাত্রা' : 'GramJatra'}</p>
             <p className="text-[11px] font-semibold leading-tight text-charcoal/55">{T.tagline}</p>
           </div>
         </div>

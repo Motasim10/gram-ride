@@ -3,8 +3,8 @@
 
 export default function manifest() {
   return {
-    name: 'Gram Ride',
-    short_name: 'Gram Ride',
+    name: 'GramJatra',
+    short_name: 'GramJatra',
     description: 'গ্রামের যাত্রা, সহজে — Shared rides and reserve rides for your village.',
     lang: 'bn',
     dir: 'ltr',
