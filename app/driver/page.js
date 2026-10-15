@@ -14,6 +14,32 @@ import { localName, stopText, money, num, formatTime, formatDate } from '@/lib/n
 
 const CAPACITY = { cng: 5, auto: 2 }
 const BACK_SEATS = { cng: 3, auto: 2 }
+// "15 minutes" / "12 hours" (Bangla digits in Bangla)
+const durText = (mins, lang) => {
+  if (mins >= 60 && mins % 60 === 0) {
+    const h = mins / 60
+    return `${num(h, lang)} ${lang === 'bn' ? 'ঘণ্টা' : h === 1 ? 'hour' : 'hours'}`
+  }
+  return `${num(mins, lang)} ${lang === 'bn' ? 'মিনিট' : 'minutes'}`
+}
+const DEFAULT_RULES = { min_ahead: 15, max_ahead: 720, gap: 15, start_before: 10, auto_cancel: 30 }
+
+const pickLang = (msg, lang) => {
+  if (typeof msg !== 'string' || !msg.includes(' / ')) return msg
+  const [bn, ...rest] = msg.split(' / ')
+  return lang === 'bn' ? bn : rest.join(' / ')
+}
+
+// Time picker: hour + minute + AM/PM, where AM = সকাল and PM = বিকাল
+const to24 = (ampm, h) => (ampm === 'AM' ? (h === 12 ? 0 : h) : (h === 12 ? 12 : h + 12))
+const defaultDeparture = () => {
+  const d = new Date(Date.now() + 30 * 60000)
+  let m = Math.ceil(d.getMinutes() / 5) * 5
+  if (m === 60) { d.setHours(d.getHours() + 1); m = 0 }
+  const h24 = d.getHours()
+  return { ampm: h24 < 12 ? 'AM' : 'PM', hour: h24 % 12 || 12, minute: m }
+}
+
 const notExpired = (r) => !r.expires_at || new Date(r.expires_at).getTime() > Date.now()
 const pickupAt = (r) => new Date(r.pickup_time || r.created_at).getTime()
 const sortByPickup = (rows) => [...rows].sort((a, b) => pickupAt(a) - pickupAt(b))
@@ -21,6 +47,33 @@ const sortByPickup = (rows) => [...rows].sort((a, b) => pickupAt(a) - pickupAt(b
 const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none disabled:opacity-50'
 const inputClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
 const dangerButtonClass = 'tap-target w-full rounded-2xl border-2 border-danger bg-white text-[15px] font-bold text-danger active:bg-danger/10 disabled:opacity-40'
+
+function TimePicker({ value, onChange, t, lang }) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-3">
+        <select value={value.hour} onChange={(e) => onChange({ ...value, hour: Number(e.target.value) })} className={selectClass} aria-label={t('hourLabel')}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{num(h, lang)} {t('hourLabel')}</option>)}
+        </select>
+        <select value={value.minute} onChange={(e) => onChange({ ...value, minute: Number(e.target.value) })} className={selectClass} aria-label={t('minuteLabel')}>
+          {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => <option key={m} value={m}>{num(String(m).padStart(2, '0'), lang)} {t('minuteLabel')}</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[['AM', t('pAM')], ['PM', t('pPM')]].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange({ ...value, ampm: key })}
+            className={`tap-target rounded-xl border-2 px-2 text-[14px] font-bold ${value.ampm === key ? 'border-emerald bg-emerald text-white' : 'border-line bg-white text-charcoal/70'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function Field({ label, children }) {
   return (
@@ -108,6 +161,10 @@ export default function DriverPage() {
   const [activeReserveRides, setActiveReserveRides] = useState([])
   const [confirmingReserveId, setConfirmingReserveId] = useState(null)
   const [reserveBlocks, setReserveBlocks] = useState([])
+  const [goMode, setGoMode] = useState('now')
+  const [dep, setDep] = useState(defaultDeparture)
+  const [rules, setRules] = useState(DEFAULT_RULES)
+  const activeDepartureIdRef = useRef(null)
 
   const ridesChannelRef = useRef(null)
   const tripChannelRef = useRef(null)
@@ -119,6 +176,12 @@ export default function DriverPage() {
   const myTripChannelRef = useRef(null)
   const profileChannelRef = useRef(null)
   const routeChannelRef = useRef(null)
+
+  // Admin can change these numbers at any time, so the page re-reads them regularly
+  const loadRules = async () => {
+    const { data: ruleRows } = await supabase.rpc('departure_rules')
+    if (Array.isArray(ruleRows) && ruleRows[0]) setRules({ ...DEFAULT_RULES, ...ruleRows[0] })
+  }
 
   const loadRouteData = async () => {
     const { data: routeRows } = await supabase.from('routes').select('*').order('id')
@@ -179,6 +242,7 @@ export default function DriverPage() {
 
       await loadReserveRequests(user.id)
       await refreshReserveBlocks()
+      await loadRules()
       subscribeToRideChanges(user.id)
       setLoading(false)
     }
@@ -203,6 +267,7 @@ export default function DriverPage() {
       if (document.visibilityState === 'visible' && userId) {
         loadReserveRequests()
         refreshReserveBlocks()
+        loadRules()
         supabase.from('profiles').select('flagged').eq('user_id', userId).single()
           .then(({ data }) => setIsFlagged(data?.flagged || false))
       }
@@ -232,6 +297,15 @@ export default function DriverPage() {
 
   useEffect(() => { isActiveDriverRef.current = !!activeTrip && activeTrip.status === 'open' }, [activeTrip?.id, activeTrip?.status])
   useEffect(() => { activeRouteIdRef.current = activeTrip ? Number(activeTrip.route_id) : null }, [activeTrip?.route_id])
+  useEffect(() => { activeDepartureIdRef.current = activeTrip && activeTrip.departure_at ? activeTrip.id : null }, [activeTrip?.id, activeTrip?.departure_at])
+  useEffect(() => {
+    const timer = setInterval(() => { supabase.rpc('expire_departures').then(() => {}); loadRules() }, 15000)
+    const channel = supabase
+      .channel('departure-rules-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => loadRules())
+      .subscribe()
+    return () => { clearInterval(timer); supabase.removeChannel(channel) }
+  }, [])
   const [, setTick] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => setTick((n) => n + 1), 5000)
@@ -253,14 +327,14 @@ export default function DriverPage() {
 
   useEffect(() => {
     if (!activeTrip || activeTrip.status !== 'open') { setWaitingPassengers([]); return }
-    loadWaitingPassengers(activeTrip.route_id)
+    loadWaitingPassengers(activeTrip.route_id, activeTrip)
   }, [activeTrip?.id, activeTrip?.status])
 
   useEffect(() => {
     if (!activeTrip || activeTrip.status !== 'open') return
     const timer = setInterval(() => {
       loadRouteQueue(activeTrip.route_id)
-      loadWaitingPassengers(activeTrip.route_id)
+      loadWaitingPassengers(activeTrip.route_id, activeTrip)
     }, 5000)
     return () => clearInterval(timer)
   }, [activeTrip?.id, activeTrip?.status])
@@ -301,10 +375,12 @@ export default function DriverPage() {
     setReserveBlocks(Array.isArray(data) ? data : [])
   }
 
-  const loadWaitingPassengers = async (routeId) => {
-    const { data } = await supabase.from('rides').select('*')
+  const loadWaitingPassengers = async (routeId, trip) => {
+    let q = supabase.from('rides').select('*')
       .eq('status', 'searching').eq('ride_type', 'shared').eq('route_id', routeId)
-      .order('created_at', { ascending: true })
+    // a scheduled departure only sees requests made for it; a go-now driver never sees those
+    q = trip && trip.departure_at ? q.eq('requested_trip_id', trip.id) : q.is('requested_trip_id', null)
+    const { data } = await q.order('created_at', { ascending: true })
     setWaitingPassengers(data || [])
   }
 
@@ -327,6 +403,8 @@ export default function DriverPage() {
     setBids(data || [])
   }
 
+  const matchesMyList = (row) => (activeDepartureIdRef.current ? row.requested_trip_id === activeDepartureIdRef.current : row.requested_trip_id == null)
+
   const subscribeToRideChanges = (uid) => {
     const channel = supabase
       .channel('driver-rides-' + Math.random().toString(36).slice(2))
@@ -335,7 +413,7 @@ export default function DriverPage() {
         if (row.status !== 'searching') return
         if (row.ride_type === 'reserve') {
           setReserveRequests((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
-        } else if (isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current) {
+        } else if (isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current && matchesMyList(row)) {
           setWaitingPassengers((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
         }
       })
@@ -349,7 +427,7 @@ export default function DriverPage() {
         if (row.status === 'searching' && row.ride_type === 'reserve') {
           setReserveRequests((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
         }
-        if (row.status === 'searching' && row.ride_type === 'shared' && isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current) {
+        if (row.status === 'searching' && row.ride_type === 'shared' && isActiveDriverRef.current && Number(row.route_id) === activeRouteIdRef.current && matchesMyList(row)) {
           setWaitingPassengers((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]))
         }
         if (row.status === 'cancelled') {
@@ -458,9 +536,19 @@ export default function DriverPage() {
   const handleGoOnline = async () => {
     if (isFlagged) { setError('Your account has been flagged and cannot accept rides right now. Contact support.'); return }
     if (!selectedRouteId) { setError(t('selectRouteFirst')); return }
+    let departureIso = null
+    if (goMode === 'time' || reserveLocked) {
+      const when = new Date()
+      when.setHours(to24(dep.ampm, dep.hour), dep.minute, 0, 0)
+      if (when.getTime() <= Date.now()) when.setDate(when.getDate() + 1)   // that time tomorrow
+      const diffMin = (when.getTime() - Date.now()) / 60000
+      if (diffMin < rules.min_ahead || diffMin > rules.max_ahead) { setError({ key: 'departureTimeInvalid' }); return }
+      departureIso = when.toISOString()
+    }
     setLoading(true); setError('')
     const { data, error: insertError } = await supabase.from('trips').insert({
       driver_id: userId, route_id: Number(selectedRouteId), vehicle_type: vehicleType, status: 'open',
+      departure_at: departureIso,
     }).select().single()
     if (insertError) { setError(insertError.message); setLoading(false); return }
     setActiveTrip(data)
@@ -482,6 +570,16 @@ export default function DriverPage() {
     setLoading(false)
   }
 
+  const handleCancelDeparture = async () => {
+    setLoading(true); setError('')
+    const { error: cancelError } = await supabase.from('trips').update({ status: 'cancelled' }).eq('id', activeTrip.id)
+    if (cancelError) { setError(cancelError.message); setLoading(false); return }
+    setActiveTrip(null)
+    setTripPassengers([])
+    setWaitingPassengers([])
+    setLoading(false)
+  }
+
   const filledSeats = tripPassengers.reduce((sum, r) => sum + r.seats, 0)
   const womenSeats = tripPassengers.reduce((sum, r) => sum + (r.women_seats || 0), 0)
   const backSeats = BACK_SEATS[vehicleType]
@@ -491,9 +589,12 @@ export default function DriverPage() {
     q.queue_pos < myPos &&
     Number(q.filled_seats) + ride.seats <= CAPACITY[q.vehicle_type] &&
     Number(q.women_seats) + (ride.women_seats || 0) <= BACK_SEATS[q.vehicle_type])
-  const blockAt = (ms) => reserveBlocks.find((b) => ms > new Date(b.start_at).getTime() && ms < new Date(b.end_at).getTime()) || null
+  const blockAt = (ms) => {
+    const hits = reserveBlocks.filter((b) => ms > new Date(b.start_at).getTime() && ms < new Date(b.end_at).getTime())
+    return hits.find((b) => b.kind !== 'departure') || hits[0] || null
+  }
   const nowBlock = blockAt(Date.now())
-  const reserveLocked = !!nowBlock
+  const reserveLocked = !!nowBlock && nowBlock.kind !== 'departure'
   const reserveLockAt = nowBlock ? nowBlock.ride_at : null
   const visibleWaiting = reserveLocked ? [] : waitingPassengers.filter((r) => notExpired(r) && !aheadCanFit(r))
   const openReserve = reserveRequests.filter(notExpired)
@@ -519,8 +620,10 @@ export default function DriverPage() {
   }
 
   const handleStartTrip = async () => {
-    setLoading(true)
-    await supabase.from('trips').update({ status: 'in_progress' }).eq('id', activeTrip.id).select()
+    setLoading(true); setError('')
+    const { error: startError } = await supabase.from('trips').update({ status: 'in_progress' }).eq('id', activeTrip.id)
+    if (startError) { setError(startError.message); setLoading(false); return }
+    for (const p of tripPassengers) await notify(p.passenger_id, 'tripStarted', {})
     setActiveTrip((prev) => ({ ...prev, status: 'in_progress' }))
     setLoading(false)
   }
@@ -571,7 +674,7 @@ export default function DriverPage() {
           </p>
         </div>
       )}
-      {error && <p className="mb-4 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
+      {error && <p className="mb-4 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{typeof error === 'object' ? t(error.key) : pickLang(error, lang)}</p>}
       {reserveLocked && (
         <div className="mb-4 rounded-2xl border-2 border-amber/60 bg-amber/10 p-4">
           <p className="font-bold text-amber-dark">
@@ -588,7 +691,7 @@ export default function DriverPage() {
       )}
 
       {/* ---------- Shared route / trip section ---------- */}
-      {!activeTrip && !reserveLocked && (
+      {!activeTrip && (
         <SectionCard className="mb-4 space-y-4">
           <Field label={t('routeLabel')}>
             <select value={selectedRouteId} onChange={(e) => setSelectedRouteId(e.target.value)} className={selectClass}>
@@ -612,7 +715,37 @@ export default function DriverPage() {
               ))}
             </div>
           </div>
-          <PrimaryButton onClick={handleGoOnline} disabled={loading || isFlagged}>{t('goOnline')}</PrimaryButton>
+          <div>
+            <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('goNowOrTime')}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[['now', t('goNowMode')], ['time', t('setTimeMode')]].map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={reserveLocked && v === 'now'}
+                  onClick={() => setGoMode(v)}
+                  className={`tap-target rounded-xl border-2 px-2 text-[14px] font-bold disabled:opacity-40 ${(reserveLocked ? 'time' : goMode) === v ? 'border-emerald bg-emerald text-white' : 'border-line bg-white text-charcoal/70'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {reserveLocked && <p className="text-[13px] font-semibold text-amber-dark">{t('reserveLockedPostTime')}</p>}
+          {(goMode === 'time' || reserveLocked) && (
+            <div>
+              <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('departureTimeLabel')}</p>
+              <TimePicker value={dep} onChange={setDep} t={t} lang={lang} />
+              <span className="mt-1 block text-[12px] text-charcoal/50">
+                {lang === 'bn'
+                  ? `এখন থেকে ${durText(rules.min_ahead, lang)} থেকে ${durText(rules.max_ahead, lang)}-এর মধ্যে`
+                  : `Between ${durText(rules.min_ahead, lang)} and ${durText(rules.max_ahead, lang)} from now`}
+              </span>
+            </div>
+          )}
+          <PrimaryButton onClick={handleGoOnline} disabled={loading || isFlagged}>
+            {goMode === 'time' || reserveLocked ? t('postDeparture') : t('goOnline')}
+          </PrimaryButton>
         </SectionCard>
       )}
 
@@ -624,7 +757,9 @@ export default function DriverPage() {
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald" />
                 <p className="font-bold text-charcoal">{t('onlineOnRoute')}</p>
               </div>
-              <Chip tone="green">{t('queuePosition')}: #{num(queuePosition, lang)}</Chip>
+              {activeTrip.departure_at
+                ? <Chip tone="amber">{t('leavesAt')}: {timeLabel(activeTrip.departure_at)}</Chip>
+                : <Chip tone="green">{t('queuePosition')}: #{num(queuePosition, lang)}</Chip>}
             </div>
             <p className="mt-1 text-[16px] font-bold text-emerald">{routeName(activeTrip.route_id)}</p>
             <p className="text-[13px] text-charcoal/60">{vehicleLabel(activeTrip.vehicle_type)}</p>
@@ -632,9 +767,28 @@ export default function DriverPage() {
               <Gauge label={t('seatsFilled')} value={filledSeats} max={capacity} lang={lang} />
               {activeTrip.vehicle_type === 'cng' && <Gauge label={t('womenAboard')} value={womenSeats} max={backSeats} lang={lang} />}
             </div>
-            <button onClick={handleGoOffline} disabled={loading} className={`${dangerButtonClass} mt-4`}>
-              {t('goOffline')}
-            </button>
+            {activeTrip.departure_at && Date.now() > new Date(activeTrip.departure_at).getTime() && (
+              <p className="mt-3 rounded-xl bg-amber/15 px-3 py-2 text-[13px] font-semibold text-amber-dark">{t('youAreLate')}</p>
+            )}
+            {activeTrip.departure_at && rules.auto_cancel > 0 && (
+              <p className="mt-3 text-[12.5px] text-charcoal/55">
+                {lang === 'bn'
+                  ? `ছাড়ার সময়ের ${durText(rules.auto_cancel, lang)} মধ্যে ট্রিপ শুরু না করলে যাত্রাটি নিজে থেকে বাতিল হয়ে যাবে।`
+                  : `If the trip is not started within ${durText(rules.auto_cancel, lang)} after the departure time, it is cancelled automatically.`}
+              </p>
+            )}
+            {activeTrip.departure_at ? (
+              <>
+                <button onClick={handleCancelDeparture} disabled={loading || tripPassengers.length > 0} className={`${dangerButtonClass} mt-4`}>
+                  {t('cancelDeparture')}
+                </button>
+                {tripPassengers.length > 0 && <p className="mt-2 text-[12px] text-charcoal/50">{t('cannotCancelWithPassengers')}</p>}
+              </>
+            ) : (
+              <button onClick={handleGoOffline} disabled={loading} className={`${dangerButtonClass} mt-4`}>
+                {t('goOffline')}
+              </button>
+            )}
           </SectionCard>
 
           {tripPassengers.length > 0 && (
@@ -685,7 +839,21 @@ export default function DriverPage() {
           </div>
 
           {tripPassengers.length > 0 && (
-            <PrimaryButton onClick={handleStartTrip} disabled={loading}>{t('startTrip')}</PrimaryButton>
+            <>
+              <PrimaryButton
+                onClick={handleStartTrip}
+                disabled={loading || (activeTrip.departure_at && Date.now() < new Date(activeTrip.departure_at).getTime() - rules.start_before * 60000)}
+              >
+                {t('startTrip')}
+              </PrimaryButton>
+              {activeTrip.departure_at && Date.now() < new Date(activeTrip.departure_at).getTime() - rules.start_before * 60000 && (
+                <p className="text-center text-[12px] text-charcoal/50">
+                  {lang === 'bn'
+                    ? `ছাড়ার ${durText(rules.start_before, lang)} আগে থেকে ট্রিপ শুরু করা যাবে।`
+                    : `You can start the trip from ${durText(rules.start_before, lang)} before departure.`}
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

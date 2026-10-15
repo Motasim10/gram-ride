@@ -16,6 +16,21 @@ import { localName, stopText, money, num, formatTime } from '@/lib/names'
 const CAPACITY = { cng: 5, auto: 2 }
 const formatLeft = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 
+const pickLang = (msg, lang) => {
+  if (typeof msg !== 'string' || !msg.includes(' / ')) return msg
+  const [bn, ...rest] = msg.split(' / ')
+  return lang === 'bn' ? bn : rest.join(' / ')
+}
+
+// "12 min" / "1 h 5 min" (Bangla digits in Bangla)
+const leftText = (ms, lang, t) => {
+  const mins = Math.max(0, Math.ceil(ms / 60000))
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  const hText = h > 0 ? `${num(h, lang)} ${lang === 'bn' ? 'ঘণ্টা' : 'h'} ` : ''
+  return `${hText}${num(m, lang)} ${t('minutesShort')}`
+}
+
 const selectClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none disabled:opacity-50'
 const inputClass = 'tap-target w-full rounded-xl border-2 border-line bg-white px-3 text-[15.5px] font-semibold text-charcoal focus:border-emerald focus:outline-none'
 const dangerButtonClass = 'tap-target w-full rounded-2xl border-2 border-danger bg-white text-[15px] font-bold text-danger active:bg-danger/10 disabled:opacity-40'
@@ -108,20 +123,24 @@ export default function PassengerPage() {
   const [pickupTimeInput, setPickupTimeInput] = useState('')
   const [womenCount, setWomenCount] = useState(0)
   const [waitMinutes, setWaitMinutes] = useState(10)
+  const [shareMode, setShareMode] = useState('now')
+  const [departures, setDepartures] = useState([])
+  const [selectedTripId, setSelectedTripId] = useState(null)
   const [nowMs, setNowMs] = useState(Date.now())
   useEffect(() => {
-    if (activeRide?.status !== 'searching') return
+    if (activeRide?.status !== 'searching' && activeRide?.status !== 'accepted') return
     const timer = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [activeRide?.status])
   const [tripStatus, setTripStatus] = useState(null)
+  const [tripDepartureAt, setTripDepartureAt] = useState(null)
   useEffect(() => {
-    const tripId = activeRide?.trip_id
-    if (!tripId) { setTripStatus(null); return }
+    const tripId = activeRide?.trip_id || activeRide?.requested_trip_id
+    if (!tripId) { setTripStatus(null); setTripDepartureAt(null); return }
     let cancelled = false
     const refresh = async () => {
-      const { data } = await supabase.from('trips').select('status').eq('id', tripId).single()
-      if (!cancelled) setTripStatus(data?.status || null)
+      const { data } = await supabase.from('trips').select('status, departure_at').eq('id', tripId).single()
+      if (!cancelled) { setTripStatus(data?.status || null); setTripDepartureAt(data?.departure_at || null) }
     }
     refresh()
     const timer = setInterval(refresh, 10000)
@@ -129,18 +148,47 @@ export default function PassengerPage() {
       .channel('my-trip-' + tripId + '-' + Math.random().toString(36).slice(2))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` }, (payload) => {
         setTripStatus(payload.new.status)
+        setTripDepartureAt(payload.new.departure_at || null)
       })
       .subscribe()
     return () => { cancelled = true; clearInterval(timer); supabase.removeChannel(channel) }
-  }, [activeRide?.trip_id])
+  }, [activeRide?.trip_id, activeRide?.requested_trip_id])
+
+  // Upcoming departures on the chosen route (only while the passenger is looking at them)
+  const loadDepartures = async (rid) => {
+    await supabase.rpc('expire_departures')
+    const { data, error: rpcError } = await supabase.rpc('open_departures', { p_route_id: Number(rid) })
+    if (rpcError) { console.error(rpcError); return }
+    setDepartures(data || [])
+  }
+  useEffect(() => {
+    if (rideType !== 'shared' || shareMode !== 'time' || !routeId || activeRide) { setDepartures([]); return }
+    loadDepartures(routeId)
+    const timer = setInterval(() => loadDepartures(routeId), 15000)
+    const channel = supabase
+      .channel('departures-' + routeId + '-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips', filter: `route_id=eq.${routeId}` }, () => loadDepartures(routeId))
+      .subscribe()
+    return () => { clearInterval(timer); supabase.removeChannel(channel) }
+  }, [rideType, shareMode, routeId, !!activeRide])
+  useEffect(() => {
+    if (selectedTripId && !departures.some((d) => d.trip_id === selectedTripId)) { setSelectedTripId(null); return }
+    if (!selectedTripId && departures.length === 1 && Number(departures[0].filled_seats) < CAPACITY[departures[0].vehicle_type]) {
+      setSelectedTripId(departures[0].trip_id)
+    }
+  }, [departures])
   const router = useRouter()
   const rideChannelRef = useRef(null)
   const bidsChannelRef = useRef(null)
   const routeChannelRef = useRef(null)
   const profileChannelRef = useRef(null)
   const { t, lang } = useLanguage()
+  const errText = (e) => (e && typeof e === 'object' ? t(e.key) : pickLang(e, lang))
 
-  const capacity = CAPACITY[vehicleType]
+  const selectedDeparture = departures.find((d) => d.trip_id === selectedTripId) || null
+  const departureMode = rideType === 'shared' && shareMode === 'time'
+  const effectiveVehicle = selectedDeparture ? selectedDeparture.vehicle_type : vehicleType
+  const capacity = CAPACITY[effectiveVehicle]
   const routeStops = stopsByRoute[routeId] || []
   const pickupStop = routeStops.find((s) => String(s.id) === String(pickupStopId))
   const dropStop = routeStops.find((s) => String(s.id) === String(dropStopId))
@@ -297,6 +345,12 @@ export default function PassengerPage() {
     e.preventDefault()
     if (isFlagged) { setError('Your account has been flagged and cannot request rides right now. Contact support.'); return }
     if (rideType === 'shared' && (!fixedFare || !pickupStop || !dropStop)) { setError(t('routeNotAvailable')); return }
+    if (departureMode && !selectedDeparture) { setError({ key: 'chooseDeparture' }); return }
+    if (departureMode) {
+      const seatsFree = CAPACITY[selectedDeparture.vehicle_type] - Number(selectedDeparture.filled_seats)
+      const backFree = (selectedDeparture.vehicle_type === 'cng' ? 3 : 2) - Number(selectedDeparture.women_seats)
+      if (Number(seats) > seatsFree || (Number(womenCount) || 0) > backFree) { setError({ key: 'departureFull' }); return }
+    }
 
     let pickupTimeIso = null
     if (rideType === 'reserve' && pickupMode === 'later') {
@@ -308,8 +362,10 @@ export default function PassengerPage() {
     }
 
     const womenSeats = rideType === 'shared' ? Number(womenCount) || 0 : 0
-    if (rideType === 'shared' && (womenSeats < 0 || womenSeats > Number(seats) || womenSeats > (vehicleType === 'cng' ? 3 : 2))) { setError(t('womenCountInvalid')); return }
-    const expiresAtIso = (rideType === 'shared' || pickupMode === 'now')
+    if (rideType === 'shared' && (womenSeats < 0 || womenSeats > Number(seats) || womenSeats > (effectiveVehicle === 'cng' ? 3 : 2))) { setError(t('womenCountInvalid')); return }
+    const expiresAtIso = departureMode
+      ? selectedDeparture.departure_at
+      : (rideType === 'shared' || pickupMode === 'now')
       ? new Date(Date.now() + Number(waitMinutes) * 60000).toISOString()
       : null
 
@@ -325,7 +381,8 @@ export default function PassengerPage() {
               passenger_id: userId,
               pickup: pickupStop.name, destination: dropStop.name,
               seats: Number(seats),
-              ride_type: 'shared', vehicle_type: vehicleType, status: 'searching',
+              ride_type: 'shared', vehicle_type: effectiveVehicle, status: 'searching',
+              requested_trip_id: departureMode ? selectedDeparture.trip_id : null,
               fare: fixedFare,
               route_id: Number(routeId),
               pickup_pos: pickupStop.position, drop_pos: dropStop.position,
@@ -581,6 +638,35 @@ export default function PassengerPage() {
           </div>
         </SectionCard>
 
+        {(() => {
+          const depMs = tripDepartureAt ? new Date(tripDepartureAt).getTime() : null
+          if (activeRide.status === 'accepted' && tripStatus === 'in_progress') {
+            return (
+              <div className="mb-4 rounded-xl border-2 border-emerald bg-mint px-4 py-3">
+                <p className="font-bold text-emerald-dark">🚗 {t('tripStartedBanner')}</p>
+              </div>
+            )
+          }
+          if (activeRide.requested_trip_id && activeRide.status === 'searching' && tripStatus && tripStatus !== 'open') {
+            return (
+              <p className="mb-4 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{t('departureCancelledBanner')}</p>
+            )
+          }
+          if (depMs && tripStatus === 'open') {
+            const late = nowMs > depMs
+            return (
+              <div className={`mb-4 rounded-xl border-2 px-4 py-3 ${late ? 'border-amber/60 bg-amber/15' : 'border-emerald/40 bg-mint'}`}>
+                <p className={`font-bold ${late ? 'text-amber-dark' : 'text-emerald-dark'}`}>
+                  {t('leavesAt')} <span className="font-num">{formatTime(tripDepartureAt, lang)}</span>
+                  {!late && <> · {t('leavesIn')} <span className="font-num">{leftText(depMs - nowMs, lang, t)}</span></>}
+                </p>
+                {late && activeRide.status === 'accepted' && <p className="mt-1 text-[13px] text-amber-dark">{t('driverRunningLate')}</p>}
+              </div>
+            )
+          }
+          return null
+        })()}
+
         {activeRide.driver_id && driverProfile && (
           <SectionCard className="mb-4">
             <div className="flex items-center gap-3">
@@ -606,7 +692,7 @@ export default function PassengerPage() {
           </SectionCard>
         )}
 
-        {error && <p className="mb-3 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
+        {error && <p className="mb-3 rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{errText(error)}</p>}
 
         {activeRide.status === 'searching' && (
           <div className="space-y-3">
@@ -614,9 +700,11 @@ export default function PassengerPage() {
               <SectionCard className="border-danger/40 bg-danger/5">
                 <p className="font-bold text-danger">{t('noDriverFound')}</p>
                 <div className="mt-3">
-                  <PrimaryButton onClick={handleExtendWait} disabled={loading}>
-                    {t('keepWaiting')} {num(waitMinutes, lang)} {t('minutesShort')}
-                  </PrimaryButton>
+                  {!activeRide.requested_trip_id && (
+                    <PrimaryButton onClick={handleExtendWait} disabled={loading}>
+                      {t('keepWaiting')} {num(waitMinutes, lang)} {t('minutesShort')}
+                    </PrimaryButton>
+                  )}
                 </div>
               </SectionCard>
             ) : (
@@ -627,9 +715,9 @@ export default function PassengerPage() {
                 </span>
                 <div className="flex-1">
                   <p className="text-[14px] font-semibold leading-snug text-amber-dark">
-                    {activeRide.ride_type === 'shared' ? t('waitingForAcceptShared') : t('waitingForQuote')}
+                    {activeRide.requested_trip_id ? t('waitingForDepartureAccept') : activeRide.ride_type === 'shared' ? t('waitingForAcceptShared') : t('waitingForQuote')}
                   </p>
-                  {activeRide.expires_at && (
+                  {activeRide.expires_at && !activeRide.requested_trip_id && (
                     <p className="mt-0.5 text-[13px] text-amber-dark">
                       {t('waitingTimeLeft')}:{' '}
                       <span className="font-num font-bold">{num(formatLeft(new Date(activeRide.expires_at).getTime() - nowMs), lang)}</span>
@@ -714,7 +802,7 @@ export default function PassengerPage() {
     )
   }
 
-  const maxWomen = Math.min(Number(seats) || 1, vehicleType === 'cng' ? 3 : 2)
+  const maxWomen = Math.min(Number(seats) || 1, effectiveVehicle === 'cng' ? 3 : 2)
 
   return (
     <Screen>
@@ -745,10 +833,21 @@ export default function PassengerPage() {
         <SectionCard className="space-y-4">
           {rideType === 'shared' ? (
             <>
+              <div>
+                <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('goNowOrTime')}</p>
+                <Segmented
+                  value={shareMode}
+                  onChange={(v) => { setShareMode(v); setSelectedTripId(null) }}
+                  options={[
+                    { value: 'now', label: t('goNowMode') },
+                    { value: 'time', label: t('upcomingDepartures') },
+                  ]}
+                />
+              </div>
               <Field label={t('routeLabel')}>
                 <select
                   value={routeId}
-                  onChange={(e) => { setRouteId(e.target.value); setPickupStopId(''); setDropStopId('') }}
+                  onChange={(e) => { setRouteId(e.target.value); setPickupStopId(''); setDropStopId(''); setSelectedTripId(null) }}
                   required
                   className={selectClass}
                 >
@@ -780,6 +879,46 @@ export default function PassengerPage() {
                   {dropOptions.map((s) => <option key={s.id} value={s.id}>{localName(s, lang)}</option>)}
                 </select>
               </Field>
+              {departureMode && routeId && (
+                <div>
+                  <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('chooseDeparture')}</p>
+                  {departures.length > 1 && !selectedTripId && <p className="mb-2 text-[12px] text-charcoal/50">{t('selectDepartureHint')}</p>}
+                  {departures.length === 0 && (
+                    <p className="rounded-xl border-2 border-line-soft bg-white px-3 py-4 text-center text-[14px] text-charcoal/50">{t('noDepartures')}</p>
+                  )}
+                  <div className="space-y-2">
+                    {departures.map((d) => {
+                      const seatsFree = CAPACITY[d.vehicle_type] - Number(d.filled_seats)
+                      const backFree = (d.vehicle_type === 'cng' ? 3 : 2) - Number(d.women_seats)
+                      const picked = d.trip_id === selectedTripId
+                      return (
+                        <button
+                          key={d.trip_id}
+                          type="button"
+                          disabled={seatsFree <= 0}
+                          onClick={() => {
+                            setSelectedTripId(d.trip_id)
+                            setSeats((s) => Math.max(1, Math.min(s, CAPACITY[d.vehicle_type], seatsFree)))
+                            setWomenCount((w) => Math.min(w, backFree))
+                          }}
+                          className={`w-full rounded-xl border-2 p-3 text-left disabled:opacity-40 ${picked ? 'border-emerald bg-mint' : 'border-line bg-white'}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-num text-[22px] font-extrabold text-emerald">{formatTime(d.departure_at, lang)}</p>
+                            <p className="text-[13px] font-semibold text-charcoal/70">{vehicleLabel(d.vehicle_type)}</p>
+                          </div>
+                          <p className="mt-0.5 text-[13px] text-charcoal/60">{d.driver_name || ''}</p>
+                          {picked && <p className="mt-1 text-[13px] font-bold text-emerald">{t('selectedLabel')}</p>}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Chip tone="green">{num(Math.max(0, seatsFree), lang)} {t('seatsLeft')}</Chip>
+                            {d.vehicle_type === 'cng' && <Chip tone="amber">{num(Math.max(0, backFree), lang)} {t('womenBackLeft')}</Chip>}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -794,7 +933,7 @@ export default function PassengerPage() {
         </SectionCard>
 
         <SectionCard className="space-y-4">
-          <div>
+          {!departureMode && <div>
             <p className="mb-1.5 text-[13px] font-semibold text-charcoal/60">{t('vehicle')}</p>
             <div className="grid grid-cols-2 gap-3">
               {[['cng', IconCar, t('cng5')], ['auto', IconAutoRickshaw, t('auto2')]].map(([v, Icon, label]) => (
@@ -809,7 +948,7 @@ export default function PassengerPage() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div>
             <p className="mb-2 text-[13px] font-semibold text-charcoal/60">
@@ -822,7 +961,7 @@ export default function PassengerPage() {
               minusDisabled={Number(seats) <= 1}
               plusDisabled={Number(seats) >= capacity}
             />
-            <p className="mt-1 text-center text-[12px] text-charcoal/50">{t('maxFor')} {num(capacity, lang)} {vehicleLabel(vehicleType)}</p>
+            <p className="mt-1 text-center text-[12px] text-charcoal/50">{t('maxFor')} {num(capacity, lang)} {vehicleLabel(effectiveVehicle)}</p>
           </div>
 
           {rideType === 'shared' && (
@@ -863,7 +1002,7 @@ export default function PassengerPage() {
           </SectionCard>
         )}
 
-        {(rideType === 'shared' || pickupMode === 'now') && (
+        {((rideType === 'shared' && !departureMode) || (rideType === 'reserve' && pickupMode === 'now')) && (
           <SectionCard className="space-y-3">
             <p className="text-[13px] font-semibold text-charcoal/60">{t('waitTimeLabel')}</p>
             <Segmented
@@ -886,14 +1025,20 @@ export default function PassengerPage() {
           )
         )}
 
-        {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{error}</p>}
+        {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-[13px] font-semibold text-danger">{errText(error)}</p>}
 
         <PrimaryButton
           type="submit"
-          disabled={loading || (rideType === 'shared' && (!pickupStopId || !dropStopId || !fixedFare))}
+          disabled={loading || (rideType === 'shared' && (!pickupStopId || !dropStopId || !fixedFare || (departureMode && !selectedDeparture)))}
         >
-          {loading ? t('requesting') : t('findRide')}
+          {loading ? t('requesting') : departureMode ? t('requestSeats') : t('findRide')}
         </PrimaryButton>
+        {rideType === 'shared' && (!pickupStopId || !dropStopId) && (
+          <p className="text-center text-[12.5px] text-charcoal/55">{t('pickStopsHint')}</p>
+        )}
+        {departureMode && pickupStopId && dropStopId && !selectedDeparture && (
+          <p className="text-center text-[12.5px] text-charcoal/55">{t('selectDepartureHint')}</p>
+        )}
       </form>
     </Screen>
   )
