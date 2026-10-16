@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const SIZE = 56
-const STORAGE_KEY = 'gramRideSosPosition'
+const STORAGE_KEY = 'gramJatraSosPosition'
 
 // A round SOS button that floats above the page. Tap it to open the SOS confirmation.
 // Press, hold and drag it to move it anywhere; it remembers where you left it.

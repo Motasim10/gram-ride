@@ -28,7 +28,7 @@ export default function Home() {
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald text-white">
         <IconAutoRickshaw size={42} />
       </div>
-      <h1 className="text-3xl font-bold text-charcoal">Gram Ride</h1>
+      <h1 className="text-3xl font-bold text-charcoal">GramJatra</h1>
       <p className="mb-10 mt-2 text-charcoal/60">{t('tagline')}</p>
       <div className="space-y-3">
         <PrimaryButton onClick={() => router.push('/login')}>{t('login')}</PrimaryButton>

@@ -1,4 +1,4 @@
-// Icons copied from the Gram Ride prototype. Plain strokes, no icon library. Colour comes from the text colour (currentColor).
+// Icons copied from the GramJatra prototype. Plain strokes, no icon library. Colour comes from the text colour (currentColor).
 const Ic = ({ children, size = 22, className = "", strokeWidth = 2.1 }) => (
   <svg
     width={size} height={size} viewBox="0 0 24 24" fill="none"

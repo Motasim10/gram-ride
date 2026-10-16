@@ -1,4 +1,4 @@
-// Icons copied from the admin design file (gram_ride_admin). Plain strokes, no icon library.
+// Icons copied from the admin design file. Plain strokes, no icon library.
 const Ic = ({ children, size = 20, className = "", strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
