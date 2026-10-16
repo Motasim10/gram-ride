@@ -3,6 +3,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import BottomNav from "@/components/ui/BottomNav";
 import PinGate from "@/components/PinGate";
+import SplashScreen from '@/components/ui/SplashScreen'
 
 const hind = Hind_Siliguri({
   variable: "--font-hind",
@@ -40,6 +41,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${hind.variable} ${manrope.variable} antialiased`}>
         <LanguageProvider>
+          <SplashScreen />
           {children}
           <BottomNav />
           <PinGate />
