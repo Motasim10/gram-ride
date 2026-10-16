@@ -13,7 +13,7 @@ export default function manifest() {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#026F4B',
+    background_color: '#2596be',
     theme_color: '#00875A',
     categories: ['travel', 'transportation'],
     icons: [
