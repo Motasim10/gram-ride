@@ -56,15 +56,12 @@ export default function Dashboard() {
   return (
     <Screen>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald text-white">
-            <IconCar size={22} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[17px] font-extrabold leading-tight text-charcoal">GramJatra</p>
-            <p className="text-[11px] font-semibold leading-tight text-charcoal/55">{T.tagline}</p>
-          </div>
-        </div>
+      <div className="flex min-w-0 flex-1 items-center">
+        <p className="truncate text-[22px] font-extrabold leading-none tracking-tight">
+          <span className="text-charcoal">{lang === 'bn' ? 'গ্রাম' : 'Gram'}</span>
+          <span className="text-emerald">{lang === 'bn' ? 'যাত্রা' : 'Jatra'}</span>
+        </p>
+      </div>
         <HeaderActions profile />
       </div>
 
