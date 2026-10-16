@@ -58,8 +58,8 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 flex-1 items-center">
         <p className="truncate text-[22px] font-extrabold leading-none tracking-tight">
-          <span className="text-charcoal">{lang === 'bn' ? 'গ্রাম' : 'Gram'}</span>
-          <span className="text-emerald">{lang === 'bn' ? 'যাত্রা' : 'Jatra'}</span>
+          <span className="text-[#243B38]">{lang === 'bn' ? 'গ্রাম' : 'Gram'}</span>
+          <span className="text-[#12702F]">{lang === 'bn' ? 'যাত্রা' : 'Jatra'}</span>
         </p>
       </div>
         <HeaderActions profile />
