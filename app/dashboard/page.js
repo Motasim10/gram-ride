@@ -69,7 +69,7 @@ export default function Dashboard() {
       </div>
 
       <div
-        className="relative mt-4 overflow-hidden rounded-3xl px-5 pb-16 pt-5"
+        className="relative mt-6 overflow-hidden rounded-3xl px-5 pb-16 pt-5"
         style={{ background: 'linear-gradient(135deg, #CDEFDB 0%, #DDF5E6 60%, #EBFAF1 100%)' }}
       >
         <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/70" />
